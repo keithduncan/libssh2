@@ -70,9 +70,9 @@ typedef struct {
 #define _libssh2_cipher_aes192
 #define _libssh2_cipher_aes128
 
-#define _libssh2_cipher_aes128ctr
-#define _libssh2_cipher_aes192ctr
 #define _libssh2_cipher_aes256ctr
+#define _libssh2_cipher_aes192ctr
+#define _libssh2_cipher_aes128ctr
 
 #define _libssh2_cipher_blowfish
 #define _libssh2_cipher_arcfour
