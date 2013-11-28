@@ -96,8 +96,8 @@ do {\
 
 #define _libssh2_bn_set_word(bn, val) \
 do {\
-CCBigNumClear(bn);\
-CCBigNumAddI(bn, bn, val);\
+  CCBigNumClear(bn);\
+  CCBigNumAddI(bn, bn, val);\
 } while (0)
 
 #define _libssh2_bn_from_bin(bn, len, val) CCBigNumFromData(NULL, val, len)
