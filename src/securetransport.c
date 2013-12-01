@@ -67,7 +67,7 @@ int _libssh2_rsa_new(libssh2_rsa_ctx **rsa,
                      unsigned long coefflen) {
   CSSM_KEY privateKey = {
     .KeyHeader = {
-      .HeaderVersion = 0,
+      .HeaderVersion = CSSM_KEYHEADER_VERSION,
       .BlobType = CSSM_KEYBLOB_RAW,
       .Format = CSSM_KEYBLOB_RAW_FORMAT_PKCS1,
       .AlgorithmId = CSSM_ALGID_RSA,
