@@ -39,7 +39,7 @@
 #define _libssh2_init_aes_ctr()
 
 #define LIBSSH2_RSA 1
-#define LIBSSH2_DSA 1
+#define LIBSSH2_DSA 0
 
 typedef struct {
 
