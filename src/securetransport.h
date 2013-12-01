@@ -36,8 +36,6 @@
 #define libssh2_crypto_init()
 #define libssh2_crypto_exit()
 
-#define _libssh2_init_aes_ctr()
-
 #define LIBSSH2_RSA 1
 #define LIBSSH2_DSA 0
 
