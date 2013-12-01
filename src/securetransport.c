@@ -3,6 +3,7 @@
 #import "securetransport.h"
 
 #import <CoreFoundation/CoreFoundation.h>
+#import <Security/SecAsn1Coder.h>
 
 #include "libssh2_priv.h"
 
