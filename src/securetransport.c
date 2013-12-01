@@ -86,40 +86,40 @@ int _libssh2_rsa_new(libssh2_rsa_ctx **rsa,
 
   _libssh2_RSA_private_key_PKCS1 privateKeyData = {
     .version = {
-      .length = sizeof(version),
-      .data = &version,
+      .Length = sizeof(version),
+      .Data = &version,
     },
     .modulus = {
-      .length = nlen,
-      .data = ndata,
+      .Length = nlen,
+      .Data = ndata,
     },
     .publicExponent = {
-      .length = elen,
-      .data = edata,
+      .Length = elen,
+      .Data = edata,
     },
     .privateExponent = {
-      .length = dlen,
-      .data = ddata,
+      .Length = dlen,
+      .Data = ddata,
     },
     .prime1 = {
-      .length = plen,
-      .data = pdata,
+      .Length = plen,
+      .Data = pdata,
     },
     .prime2 = {
-      .length = qlen,
-      .data = qdata,
+      .Length = qlen,
+      .Data = qdata,
     },
     .exponent1 = {
-      .length = e1len,
-      .data = e1data,
+      .Length = e1len,
+      .Data = e1data,
     },
     .exponent2 = {
-      .length = e2len,
-      .data = e2data,
+      .Length = e2len,
+      .Data = e2data,
     },
     .coefficient = {
-      .length = coefflen,
-      .data = coeffdata,
+      .Length = coefflen,
+      .Data = coeffdata,
     },
   };
 
