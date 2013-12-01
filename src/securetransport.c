@@ -91,35 +91,35 @@ int _libssh2_rsa_new(libssh2_rsa_ctx **rsa,
     },
     .modulus = {
       .Length = nlen,
-      .Data = ndata,
+      .Data = (uint8_t *)ndata,
     },
     .publicExponent = {
       .Length = elen,
-      .Data = edata,
+      .Data = (uint8_t *)edata,
     },
     .privateExponent = {
       .Length = dlen,
-      .Data = ddata,
+      .Data = (uint8_t *)ddata,
     },
     .prime1 = {
       .Length = plen,
-      .Data = pdata,
+      .Data = (uint8_t *)pdata,
     },
     .prime2 = {
       .Length = qlen,
-      .Data = qdata,
+      .Data = (uint8_t *)qdata,
     },
     .exponent1 = {
       .Length = e1len,
-      .Data = e1data,
+      .Data = (uint8_t *)e1data,
     },
     .exponent2 = {
       .Length = e2len,
-      .Data = e2data,
+      .Data = (uint8_t *)e2data,
     },
     .coefficient = {
       .Length = coefflen,
-      .Data = coeffdata,
+      .Data = (uint8_t *)coeffdata,
     },
   };
 
