@@ -22,7 +22,7 @@ typedef struct {
   CSSM_DATA coefficient;
 } _libssh2_RSA_private_key_PKCS1;
 
-typedef enum : uint8_t {
+typedef enum {
   RSA_Version_TwoPrime = 0,
   RSA_Version_Multi = 1,
 } RSA_Version;
@@ -82,7 +82,7 @@ int _libssh2_rsa_new(libssh2_rsa_ctx **rsa,
       with the result.
    */
 
-   RSA_Version version = RSA_Version_TwoPrime;
+   uint8_t version = RSA_Version_TwoPrime;
 
   _libssh2_RSA_private_key_PKCS1 privateKeyData = {
     .version = {
