@@ -4,6 +4,10 @@
 #import <CommonCrypto/CommonCrypto.h>
 #import "CommonBigNum.h"
 
+// The CDSA is deprecated in favour of the SecKey API, but it isn't as
+// functional.
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+
 #define _libssh2_random(buf, len) SecRandomCopyBytes(kSecRandomDefault, len, buf)
 
 #define SHA_DIGEST_LENGTH CC_SHA1_DIGEST_LENGTH
