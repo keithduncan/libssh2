@@ -2,14 +2,48 @@
 
 #import "securetransport.h"
 
+#import <CoreFoundation/CoreFoundation.h>
+
 #include "libssh2_priv.h"
 
 #pragma mark - RSA
 
+// <http://tools.ietf.org/html/rfc3447#appendix-A.1.2>
+typedef struct {
+  CSSM_DATA version; // RSA_Version_TwoPrime
+  CSSM_DATA modulus;
+  CSSM_DATA publicExponent;
+  CSSM_DATA privateExponent;
+  CSSM_DATA prime1;
+  CSSM_DATA prime2;
+  CSSM_DATA exponent1;
+  CSSM_DATA exponent2;
+  CSSM_DATA coefficient;
+} _libssh2_RSA_private_key_PKCS1;
+
+typedef enum : uint8_t {
+  RSA_Version_TwoPrime = 0,
+  RSA_Version_Multi = 1,
+} RSA_Version;
+
+static const SecAsn1Template _libssh2_RSA_private_key_PKCS1_template[] = {
+  { .kind = SEC_ASN1_SEQUENCE, .size = sizeof(_libssh2_RSA_private_key_PKCS1_template) },
+  { .kind = SEC_ASN1_INTEGER, .offset = offsetof(_libssh2_RSA_private_key_PKCS1, version) },
+  { .kind = SEC_ASN1_INTEGER, .offset = offsetof(_libssh2_RSA_private_key_PKCS1, modulus) },
+  { .kind = SEC_ASN1_INTEGER, .offset = offsetof(_libssh2_RSA_private_key_PKCS1, publicExponent) },
+  { .kind = SEC_ASN1_INTEGER, .offset = offsetof(_libssh2_RSA_private_key_PKCS1, privateExponent) },
+  { .kind = SEC_ASN1_INTEGER, .offset = offsetof(_libssh2_RSA_private_key_PKCS1, prime1) },
+  { .kind = SEC_ASN1_INTEGER, .offset = offsetof(_libssh2_RSA_private_key_PKCS1, prime2) },
+  { .kind = SEC_ASN1_INTEGER, .offset = offsetof(_libssh2_RSA_private_key_PKCS1, exponent1) },
+  { .kind = SEC_ASN1_INTEGER, .offset = offsetof(_libssh2_RSA_private_key_PKCS1, exponent2) },
+  { .kind = SEC_ASN1_INTEGER, .offset = offsetof(_libssh2_RSA_private_key_PKCS1, coefficient) },
+  { },
+};
+
 /*
     Create an RSA key from the raw numeric components.
 
-    e, n, d, p, q, e1, e2, coeff - positive integer in big-endian form
+    version, e, n, d, p, q, e1, e2, coeff - positive integer in big-endian form.
 
     Returns 0 if the key is created, 1 otherwise.
 */
@@ -30,7 +64,82 @@ int _libssh2_rsa_new(libssh2_rsa_ctx **rsa,
                      unsigned long e2len,
                      unsigned char const *coeffdata,
                      unsigned long coefflen) {
-  return 1;
+  CSSM_KEY privateKey = {
+    .KeyHeader = {
+      .HeaderVersion = 0,
+      .BlobType = CSSM_KEYBLOB_RAW,
+      .Format = CSSM_KEYBLOB_RAW_FORMAT_PKCS1,
+      .AlgorithmId = CSSM_ALGID_RSA,
+      .KeyClass = CSSM_KEYCLASS_PRIVATE_KEY,
+      .LogicalKeySizeInBits = 0, // FIXME
+      .KeyUsage = (CSSM_KEYUSE_SIGN | CSSM_KEYUSE_VERIFY),
+    },
+  };
+
+  /*
+      Convert the raw numeric binary data to PKCS#1 format, create a CSSM_KEY
+      with the result.
+   */
+
+   RSA_Version version = RSA_Version_TwoPrime;
+
+  _libssh2_RSA_private_key_PKCS1 privateKeyData = {
+    .version = {
+      .length = sizeof(version),
+      .data = &version,
+    },
+    .modulus = {
+      .length = nlen,
+      .data = ndata,
+    },
+    .publicExponent = {
+      .length = elen,
+      .data = edata,
+    },
+    .privateExponent = {
+      .length = dlen,
+      .data = ddata,
+    },
+    .prime1 = {
+      .length = plen,
+      .data = pdata,
+    },
+    .prime2 = {
+      .length = qlen,
+      .data = qdata,
+    },
+    .exponent1 = {
+      .length = e1len,
+      .data = e1data,
+    },
+    .exponent2 = {
+      .length = e2len,
+      .data = e2data,
+    },
+    .coefficient = {
+      .length = coefflen,
+      .data = coeffdata,
+    },
+  };
+
+  SecAsn1CoderRef coder = NULL;
+  OSStatus error = SecAsn1CoderCreate(&coder);
+  if (error != noErr) {
+    return 1;
+  }
+
+  error = SecAsn1EncodeItem(coder, &privateKeyData, _libssh2_RSA_private_key_PKCS1_template, &privateKey.KeyData);
+
+  SecAsn1CoderRelease(coder);
+
+  if (error != noErr) {
+    return 1;
+  }
+
+  *rsa = malloc(sizeof(privateKey));
+  memcpy(*rsa, &privateKey, sizeof(privateKey));
+
+  return 0;
 }
 
 /*
@@ -43,6 +152,12 @@ int _libssh2_rsa_new_private(libssh2_rsa_ctx **rsa,
                              char const *filename,
                              unsigned char const *passphrase) {
   return 1;
+}
+
+int _libssh2_rsa_free(libssh2_rsa_ctx *rsactx) {
+  bzero(rsactx, sizeof(CSSM_KEY)); // should probably _actually_ zero the data
+  free(rsactx);
+  return 0;
 }
 
 int _libssh2_rsa_sha1_verify(libssh2_rsa_ctx *rsa,

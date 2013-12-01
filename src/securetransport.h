@@ -41,11 +41,9 @@
 #define LIBSSH2_RSA 1
 #define LIBSSH2_DSA 0
 
-typedef struct {
+typedef CSSM_KEY libssh2_rsa_ctx;
 
-} libssh2_rsa_ctx;
-
-#define _libssh2_rsa_free(rsactx)
+int _libssh2_rsa_free(libssh2_rsa_ctx *rsactx);
 
 typedef struct {
 
