@@ -6,6 +6,13 @@
 
 #pragma mark - RSA
 
+/*
+    Create an RSA key from the raw numeric components.
+
+    e, n, d, p, q, e1, e2, coeff - positive integer in big-endian form
+
+    Returns 0 if the key is created, 1 otherwise.
+*/
 int _libssh2_rsa_new(libssh2_rsa_ctx **rsa,
                      unsigned char const *edata,
                      unsigned long elen,
@@ -23,14 +30,19 @@ int _libssh2_rsa_new(libssh2_rsa_ctx **rsa,
                      unsigned long e2len,
                      unsigned char const *coeffdata,
                      unsigned long coefflen) {
-  return 0;
+  return 1;
 }
 
+/*
+    Create an RSA key from a file (format?).
+
+    Returns 0 if the key is created, 1 otherwise.
+*/
 int _libssh2_rsa_new_private(libssh2_rsa_ctx **rsa,
                              LIBSSH2_SESSION *session,
                              char const *filename,
                              unsigned char const *passphrase) {
-  return 0;
+  return 1;
 }
 
 int _libssh2_rsa_sha1_verify(libssh2_rsa_ctx *rsa,
@@ -38,7 +50,7 @@ int _libssh2_rsa_sha1_verify(libssh2_rsa_ctx *rsa,
                              unsigned long sig_len,
                              unsigned char const *m,
                              unsigned long m_len) {
-  return 0;
+  return 1;
 }
 
 int _libssh2_rsa_sha1_sign(LIBSSH2_SESSION *session,
@@ -47,7 +59,7 @@ int _libssh2_rsa_sha1_sign(LIBSSH2_SESSION *session,
                            size_t hash_len,
                            unsigned char **signature,
                            size_t *signature_len) {
-  return 0;
+  return 1;
 }
 
 #pragma mark - DSA
@@ -63,14 +75,14 @@ int _libssh2_dsa_new(libssh2_dsa_ctx **dsa,
                      unsigned long ylen,
                      unsigned char const *x,
                      unsigned long x_len) {
-  return 0;
+  return 1;
 }
 
 int _libssh2_dsa_new_private(libssh2_dsa_ctx **dsa,
                              LIBSSH2_SESSION *session,
                              char const *filename,
                              unsigned char const *passphrase) {
-  return 0;
+  return 1;
 }
 
 int _libssh2_dsa_sha1_verify(libssh2_dsa_ctx *dsactx,
@@ -84,7 +96,7 @@ int _libssh2_dsa_sha1_sign(libssh2_dsa_ctx *dsactx,
                            unsigned char const *hash,
                            unsigned long hash_len,
                            unsigned char *sig) {
-  return 0;
+  return 1;
 }
 
 #pragma mark - Ciphers
@@ -102,7 +114,7 @@ int _libssh2_cipher_crypt(_libssh2_cipher_ctx *ctx,
                           int encrypt,
                           unsigned char *block,
                           size_t blocksize) {
-  return 0;
+  return 1;
 }
 
 #pragma mark - Private Public Keys
@@ -114,5 +126,5 @@ int _libssh2_pub_priv_keyfile(LIBSSH2_SESSION *session,
                               size_t *pubkeydata_len,
                               char const *privatekey,
                               char const *passphrase) {
-  return 0;
+  return 1;
 }
