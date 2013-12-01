@@ -28,7 +28,7 @@ typedef enum {
 } RSA_Version;
 
 static const SecAsn1Template _libssh2_RSA_private_key_PKCS1_template[] = {
-  { .kind = SEC_ASN1_SEQUENCE, .size = sizeof(_libssh2_RSA_private_key_PKCS1_template) },
+  { .kind = SEC_ASN1_SEQUENCE, .size = sizeof(_libssh2_RSA_private_key_PKCS1) },
   { .kind = SEC_ASN1_INTEGER, .offset = offsetof(_libssh2_RSA_private_key_PKCS1, version) },
   { .kind = SEC_ASN1_INTEGER, .offset = offsetof(_libssh2_RSA_private_key_PKCS1, modulus) },
   { .kind = SEC_ASN1_INTEGER, .offset = offsetof(_libssh2_RSA_private_key_PKCS1, publicExponent) },
@@ -130,15 +130,19 @@ int _libssh2_rsa_new(libssh2_rsa_ctx **rsa,
   }
 
   error = SecAsn1EncodeItem(coder, &privateKeyData, _libssh2_RSA_private_key_PKCS1_template, &privateKey.KeyData);
-
-  SecAsn1CoderRelease(coder);
-
   if (error != noErr) {
+    SecAsn1CoderRelease(coder);
     return 1;
   }
 
   *rsa = malloc(sizeof(privateKey));
-  memcpy(*rsa, &privateKey, sizeof(privateKey));
+  memmove(&((*rsa)->KeyHeader), &privateKey.KeyHeader, sizeof(privateKey.KeyHeader));
+
+  (*rsa)->KeyData.Length = privateKey.KeyData.Length;
+  (*rsa)->KeyData.Data = malloc(privateKey.KeyData.Length);
+  memmove((*rsa)->KeyData.Data, privateKey.KeyData.Data, privateKey.KeyData.Length);
+
+  SecAsn1CoderRelease(coder);
 
   return 0;
 }
@@ -156,8 +160,12 @@ int _libssh2_rsa_new_private(libssh2_rsa_ctx **rsa,
 }
 
 int _libssh2_rsa_free(libssh2_rsa_ctx *rsactx) {
+  bzero(rsactx->KeyData.Data, rsactx->KeyData.Length);
+  free(rsactx->KeyData.Data);
+
   bzero(rsactx, sizeof(CSSM_KEY)); // should probably _actually_ zero the data
   free(rsactx);
+
   return 0;
 }
 
