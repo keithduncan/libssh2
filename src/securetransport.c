@@ -213,7 +213,14 @@ int _libssh2_rsa_new(libssh2_rsa_ctx **rsa,
 }
 
 /*
-    Create an RSA key from a file (format?).
+    Create an RSA key from a file.
+
+    From libgcrypt.c, it only handles PEM encoded non-encrypted PKCS#1 keys.
+
+    From openssl.c, the file data is passed into PEM_read_bio_RSAPrivateKey,
+    this function can handle PEM encoded keys (both non-encrypted and encrypted
+    with the details in the PEM object header), and PKCS#8 encoded keys (again
+    both non-encrypted and encrypted at the PKCS#8 layer).
 
     Returns 0 if the key is created, 1 otherwise.
 */
