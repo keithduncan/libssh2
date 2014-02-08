@@ -212,6 +212,56 @@ int _libssh2_rsa_new(libssh2_rsa_ctx **rsa,
   return 0;
 }
 
+static CFDataRef CreateDataFromFile(char const *path) {
+	CFStringRef keyFilePath = CFStringCreateWithCString(kCFAllocatorDefault, path, kCFStringEncodingUTF8);
+	CFURLRef keyFileLocation = CFURLCreateWithFileSystemPath(kCFAllocatorDefault, keyFilePath, kCFURLPOSIXPathStyle, false);
+	CFRelease(keyFilePath);
+
+	CFReadStreamRef readStream = CFReadStreamCreateWithFile(kCFAllocatorDefault, keyFileLocation);
+	CFRelease(keyFileLocation);
+
+	if (!CFReadStreamOpen(readStream)) {
+		CFRelease(readStream);
+		return NULL;
+	}
+
+  CFMutableDataRef keyData = CFDataCreateMutable(kCFAllocatorDefault, 0);
+
+	size_t size = 1024;
+	uint8_t bytes[size];
+
+	while (1) {
+		CFIndex read = CFReadStreamRead(readStream, bytes, size);
+		if (read < 1) {
+			CFRelease(keyData);
+			keyData = NULL;
+			break;
+		}
+
+		CFDataAppendBytes(keyData, bytes, read);
+	}
+
+	CFReadStreamClose(readStream);
+	CFRelease(readStream);
+
+	return (CFDataRef)keyData;
+}
+
+/*
+    Create an RSA key from a PEM file.
+
+    The key may be encrypted, the PEM headers will indicate the parameters.
+
+    keyData    - Will not be NULL.
+    passphrase - May be NULL, not covariant with whether the key is encrypted or
+                 not.
+    
+    Returns 0 if the key was populated, 1 otherwise.
+ */
+static int _libssh2_rsa_new_pem_encoded_key(libssh2_rsa_ctx **rsa, LIBSSH2_SESSION *session, CFDataRef keyData, CFStringRef passphrase) {
+  return 1;
+}
+
 /*
     Create an RSA key from a file.
 
@@ -236,7 +286,21 @@ int _libssh2_rsa_new_private(libssh2_rsa_ctx **rsa,
                              LIBSSH2_SESSION *session,
                              char const *filename,
                              unsigned char const *passphrase) {
-  return 1;
+  CFDataRef keyData = CreateDataFromFile(filename);
+	if (keyData == NULL) {
+		return 1;
+	}
+
+  // UTF-8 may not be the correct encoding here, but a good guess given that it
+  // covers ASCII too.
+	CFStringRef cfPassphrase = passphrase ? CFStringCreateWithCString(kCFAllocatorDefault, (char const *)passphrase, kCFStringEncodingUTF8) : NULL;
+
+  int result = _libssh2_rsa_new_pem_encoded_key(rsa, session, keyData, cfPassphrase);
+
+	CFRelease(cfPassphrase);
+	CFRelease(keyData);
+
+	return result;
 }
 
 int _libssh2_rsa_free(libssh2_rsa_ctx *rsactx) {
