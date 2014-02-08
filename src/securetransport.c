@@ -7,6 +7,67 @@
 
 #include "libssh2_priv.h"
 
+static const CSSM_GUID _libssh2_cdsa_guid = { 0xA606, 0x71CF, 0x8F03, { 0x48, 0xE0, 0xAF, 0xE8, 0x8D, 0x20, 0x86, 0x16 } }; // generated using `uuidgen`
+static CSSM_CSP_HANDLE _libssh2_cdsa_csp = CSSM_INVALID_HANDLE;
+
+static void *_libssh2_cdsa_malloc(CSSM_SIZE size, void *allocref) {
+  return malloc(size);
+}
+
+static void _libssh2_cdsa_free(void *memory, void *allocref) {
+  free(memory);
+}
+
+static void *_libssh2_cdsa_realloc(void *memory, CSSM_SIZE size, void *allocref) {
+  return realloc(memory, size);
+}
+
+static void *_libssh2_cdsa_calloc(uint32_t number, CSSM_SIZE size, void *allocref) {
+  return calloc(number, size);
+}
+
+static const CSSM_API_MEMORY_FUNCS _libssh2_cdsa_memory_functions = {
+	_libssh2_cdsa_malloc,
+	_libssh2_cdsa_free,
+	_libssh2_cdsa_realloc,
+  _libssh2_cdsa_calloc,
+  NULL,
+};
+
+static void attachToModules(void) {
+  CSSM_VERSION version = {
+    .Major = 2,
+    .Minor = 0,
+  };
+  CSSM_PVC_MODE pvcPolicy = CSSM_PVC_NONE;
+  CSSM_RETURN error = CSSM_Init(&version, CSSM_PRIVILEGE_SCOPE_PROCESS, &_libssh2_cdsa_guid, CSSM_KEY_HIERARCHY_NONE, &pvcPolicy, NULL);
+  if (error != CSSM_OK) {
+    return;
+  }
+
+  error = CSSM_ModuleLoad(&gGuidAppleCSP, CSSM_KEY_HIERARCHY_NONE, NULL, NULL);
+  if (error != CSSM_OK) {
+    return;
+  }
+
+  error = CSSM_ModuleAttach(&gGuidAppleCSP, &version, &_libssh2_cdsa_memory_functions, 0, CSSM_SERVICE_CSP, 0, CSSM_KEY_HIERARCHY_NONE, NULL, 0, NULL, &_libssh2_cdsa_csp);
+  if (error != CSSM_OK) {
+    return;
+  }
+}
+
+static void detachFromModules(void) {
+  // FIXME
+}
+
+void libssh2_crypto_init(void) {
+  attachToModules();
+}
+
+void libssh2_crypto_exit(void) {
+  detachFromModules();
+}
+
 #pragma mark - RSA
 
 // <http://tools.ietf.org/html/rfc3447#appendix-A.1.2>
@@ -135,6 +196,10 @@ int _libssh2_rsa_new(libssh2_rsa_ctx **rsa,
     return 1;
   }
 
+  CSSM_KEY_SIZE keySize = {};
+  CSSM_QueryKeySizeInBits(_libssh2_cdsa_csp, 0, &privateKey, &keySize);
+  privateKey.KeyHeader.LogicalKeySizeInBits = keySize.LogicalKeySizeInBits;
+
   *rsa = malloc(sizeof(privateKey));
   memmove(&((*rsa)->KeyHeader), &privateKey.KeyHeader, sizeof(privateKey.KeyHeader));
 
@@ -183,6 +248,26 @@ int _libssh2_rsa_sha1_sign(LIBSSH2_SESSION *session,
                            size_t hash_len,
                            unsigned char **signature,
                            size_t *signature_len) {
+  CSSM_CC_HANDLE context = CSSM_INVALID_HANDLE;
+  CSSM_RETURN error = CSSM_CSP_CreateSignatureContext(_libssh2_cdsa_csp, CSSM_ALGID_RSA, NULL, rsactx, &context);
+  if (error != CSSM_OK) {
+    return 1;
+  }
+
+  CSSM_CONTEXT_ATTRIBUTE blindingAttribute = {
+    .AttributeType = CSSM_ATTRIBUTE_RSA_BLINDING,
+    .AttributeLength = sizeof(uint32),
+    .Attribute.Uint32 = 1,
+  };
+  error = CSSM_UpdateContextAttributes(context, 1, &blindingAttribute);
+  if (error != CSSM_OK) {
+    return 1;
+  }
+
+
+
+  CSSM_DeleteContext(context);
+
   return 1;
 }
 

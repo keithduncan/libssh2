@@ -8,6 +8,9 @@
 // functional.
 #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
 
+void libssh2_crypto_init(void);
+void libssh2_crypto_exit(void);
+
 #define _libssh2_random(buf, len) SecRandomCopyBytes(kSecRandomDefault, len, buf)
 
 #define SHA_DIGEST_LENGTH CC_SHA1_DIGEST_LENGTH
@@ -36,9 +39,6 @@
 #define libssh2_hmac_update(ctx, data, datalen) CCHmacUpdate(&ctx, data, datalen)
 #define libssh2_hmac_final(ctx, data) CCHmacFinal(&ctx, data)
 #define libssh2_hmac_cleanup(ctx)
-
-#define libssh2_crypto_init()
-#define libssh2_crypto_exit()
 
 #define LIBSSH2_RSA 1
 #define LIBSSH2_DSA 0
