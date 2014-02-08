@@ -222,6 +222,14 @@ int _libssh2_rsa_new(libssh2_rsa_ctx **rsa,
     with the details in the PEM object header), and PKCS#8 encoded keys (again
     both non-encrypted and encrypted at the PKCS#8 layer).
 
+    This effectively has to duplicate the functionality of `SecItemImport`.
+
+    See `impExpImportRawKey` for non-encrypted PEM, and
+    `impExpWrappedKeyOpenSslExport` for encrypted PEM, to create the CSSM_Key.
+
+    See `impExpPkcs8Import` and `impExpImportKeyCommon` in Security.framework
+    for the CSSM routines to create the CSSM_Key for PKCS#8.
+
     Returns 0 if the key is created, 1 otherwise.
 */
 int _libssh2_rsa_new_private(libssh2_rsa_ctx **rsa,
