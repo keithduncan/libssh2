@@ -240,6 +240,8 @@ int _libssh2_rsa_new_private(libssh2_rsa_ctx **rsa,
 }
 
 int _libssh2_rsa_free(libssh2_rsa_ctx *rsactx) {
+  // Why isn't this using CSSM_FreeKey?
+
   bzero(rsactx->KeyData.Data, rsactx->KeyData.Length);
   free(rsactx->KeyData.Data);
 
