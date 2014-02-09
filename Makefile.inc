@@ -8,7 +8,7 @@ if LIBGCRYPT
 CSOURCES += libgcrypt.c
 endif
 if SECURETRANSPORT
-CSOURCES += securetransport.c
+CSOURCES += securetransport.m
 endif
 
 HHEADERS = libssh2_priv.h transport.h channel.h comp.h mac.h misc.h \

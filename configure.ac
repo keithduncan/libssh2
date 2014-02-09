@@ -144,6 +144,8 @@ if test "$cv_framework_securetransport" = "yes"; then
   found_crypto=securetransport
 
   AC_CHECK_FUNCS(SecRandomCopyBytes)
+
+  AC_PROG_OBJC
 fi
 AM_CONDITIONAL(SECURETRANSPORT, test "$cv_framework_securetransport" = "yes")
 
