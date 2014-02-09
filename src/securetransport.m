@@ -213,38 +213,38 @@ int _libssh2_rsa_new(libssh2_rsa_ctx **rsa,
 }
 
 static CFDataRef CreateDataFromFile(char const *path) {
-	CFStringRef keyFilePath = CFStringCreateWithCString(kCFAllocatorDefault, path, kCFStringEncodingUTF8);
-	CFURLRef keyFileLocation = CFURLCreateWithFileSystemPath(kCFAllocatorDefault, keyFilePath, kCFURLPOSIXPathStyle, false);
-	CFRelease(keyFilePath);
+  CFStringRef keyFilePath = CFStringCreateWithCString(kCFAllocatorDefault, path, kCFStringEncodingUTF8);
+  CFURLRef keyFileLocation = CFURLCreateWithFileSystemPath(kCFAllocatorDefault, keyFilePath, kCFURLPOSIXPathStyle, false);
+  CFRelease(keyFilePath);
 
-	CFReadStreamRef readStream = CFReadStreamCreateWithFile(kCFAllocatorDefault, keyFileLocation);
-	CFRelease(keyFileLocation);
+  CFReadStreamRef readStream = CFReadStreamCreateWithFile(kCFAllocatorDefault, keyFileLocation);
+  CFRelease(keyFileLocation);
 
-	if (!CFReadStreamOpen(readStream)) {
-		CFRelease(readStream);
-		return NULL;
-	}
+  if (!CFReadStreamOpen(readStream)) {
+    CFRelease(readStream);
+    return NULL;
+  }
 
   CFMutableDataRef keyData = CFDataCreateMutable(kCFAllocatorDefault, 0);
 
-	size_t size = 1024;
-	uint8_t bytes[size];
+  size_t size = 1024;
+  uint8_t bytes[size];
 
-	while (1) {
-		CFIndex read = CFReadStreamRead(readStream, bytes, size);
-		if (read < 1) {
-			CFRelease(keyData);
-			keyData = NULL;
-			break;
-		}
+  while (1) {
+    CFIndex read = CFReadStreamRead(readStream, bytes, size);
+    if (read < 1) {
+      CFRelease(keyData);
+      keyData = NULL;
+      break;
+    }
 
-		CFDataAppendBytes(keyData, bytes, read);
-	}
+    CFDataAppendBytes(keyData, bytes, read);
+  }
 
-	CFReadStreamClose(readStream);
-	CFRelease(readStream);
+  CFReadStreamClose(readStream);
+  CFRelease(readStream);
 
-	return (CFDataRef)keyData;
+  return (CFDataRef)keyData;
 }
 
 /*
@@ -292,20 +292,20 @@ int _libssh2_rsa_new_private(libssh2_rsa_ctx **rsa,
                              char const *filename,
                              unsigned char const *passphrase) {
   CFDataRef keyData = CreateDataFromFile(filename);
-	if (keyData == NULL) {
-		return 1;
-	}
+  if (keyData == NULL) {
+    return 1;
+  }
 
   // UTF-8 may not be the correct encoding here, but a good guess given that it
   // covers ASCII too.
-	CFStringRef cfPassphrase = passphrase ? CFStringCreateWithCString(kCFAllocatorDefault, (char const *)passphrase, kCFStringEncodingUTF8) : NULL;
+  CFStringRef cfPassphrase = passphrase ? CFStringCreateWithCString(kCFAllocatorDefault, (char const *)passphrase, kCFStringEncodingUTF8) : NULL;
 
   int result = _libssh2_rsa_new_pem_encoded_pkcs1_key(rsa, session, keyData, cfPassphrase);
 
-	CFRelease(cfPassphrase);
-	CFRelease(keyData);
+  CFRelease(cfPassphrase);
+  CFRelease(keyData);
 
-	return result;
+  return result;
 }
 
 int _libssh2_rsa_free(libssh2_rsa_ctx *rsactx) {
