@@ -268,14 +268,19 @@ static int _libssh2_rsa_new_pem_encoded_pkcs1_key(libssh2_rsa_ctx **rsa, LIBSSH2
     From libgcrypt.c, it only handles PEM encoded non-encrypted PKCS#1 keys.
 
     From openssl.c, the file data is passed into PEM_read_bio_RSAPrivateKey,
-    this function can handle PEM encoded keys (both non-encrypted and encrypted
-    with the details in the PEM object header), and PKCS#8 encoded keys (again
-    both non-encrypted and encrypted at the PKCS#8 layer).
+    this function can handle PKCS#1 encoded keys (both non-encrypted [standard]
+    and encrypted [openssl extension] with the encryption details in the PEM
+    object header), and PKCS#8 encoded keys (again both non-encrypted and
+    encrypted - this time at the PKCS#8 layer).
+
+    PKCS#1 keys will always be PEM encoded, PKCS#8 keys may be PEM or DER
+    encoded.
 
     This effectively has to duplicate the functionality of `SecItemImport`.
 
-    See `impExpImportRawKey` for non-encrypted PEM, and
-    `impExpWrappedKeyOpenSslExport` for encrypted PEM, to create the CSSM_Key.
+    See `impExpImportRawKey` for non-encrypted PKCS#1, and
+    `impExpWrappedKeyOpenSslExport` for encrypted PKCS#1, to create the
+    CSSM_Key.
 
     See `impExpPkcs8Import` and `impExpImportKeyCommon` in Security.framework
     for the CSSM routines to create the CSSM_Key for PKCS#8.
