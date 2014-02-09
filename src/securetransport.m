@@ -258,7 +258,7 @@ static CFDataRef CreateDataFromFile(char const *path) {
     
     Returns 0 if the key was populated, 1 otherwise.
  */
-static int _libssh2_rsa_new_pem_encoded_key(libssh2_rsa_ctx **rsa, LIBSSH2_SESSION *session, CFDataRef keyData, CFStringRef passphrase) {
+static int _libssh2_rsa_new_pem_encoded_pkcs1_key(libssh2_rsa_ctx **rsa, LIBSSH2_SESSION *session, CFDataRef keyData, CFStringRef passphrase) {
   return 1;
 }
 
@@ -295,7 +295,7 @@ int _libssh2_rsa_new_private(libssh2_rsa_ctx **rsa,
   // covers ASCII too.
 	CFStringRef cfPassphrase = passphrase ? CFStringCreateWithCString(kCFAllocatorDefault, (char const *)passphrase, kCFStringEncodingUTF8) : NULL;
 
-  int result = _libssh2_rsa_new_pem_encoded_key(rsa, session, keyData, cfPassphrase);
+  int result = _libssh2_rsa_new_pem_encoded_pkcs1_key(rsa, session, keyData, cfPassphrase);
 
 	CFRelease(cfPassphrase);
 	CFRelease(keyData);
