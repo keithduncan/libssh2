@@ -140,7 +140,7 @@ if test "$found_crypto" = "none" && test "$use_securetransport" != "no"; then
 fi
 if test "$cv_framework_securetransport" = "yes"; then
   AC_DEFINE([LIBSSH2_SECURETRANSPORT], 1, [Use SecureTransport])
-  LIBS="$LIBS -framework Security -framework CoreFoundation"
+  LIBS="$LIBS -framework Security -framework Foundation"
   found_crypto=securetransport
 
   AC_CHECK_FUNCS(SecRandomCopyBytes)
