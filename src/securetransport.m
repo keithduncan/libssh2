@@ -250,7 +250,40 @@ static CFDataRef CreateDataFromFile(char const *path) {
 /*
     Create an RSA key from a PEM file.
 
-    The key may be encrypted, the PEM headers will indicate the parameters.
+    The key data may be a PKCS#1 key (non-encrypted or encrypted [PEM headers
+    will indicate the parameters]) or a PKCS#8 key.
+
+    PKCS#1 keys are bounded by the header/footer
+
+      For both non encrypted and encrypted keys
+      -----BEGIN RSA PRIVATE KEY-----
+      -----END RSA PRIVATE KEY-----
+
+    PKCS#8 keys are bounded by the header/footer
+
+      For a non-encrypted key
+      -----BEGIN PRIVATE KEY-----
+      -----END PRIVATE KEY-----
+
+      For an encrypted key
+      -----BEGIN ENCRYPTED PRIVATE KEY-----
+      -----END ENCRYPTED PRIVATE KEY-----
+
+    Note that a PKCS#8 key may not be an RSA key, it may be another key type,
+    the key type must be checked.
+
+    In both PKCS#1 and PKCS#8, the general form of the object is:
+
+      key = header newline [ *parameter newline ] 1*key-data footer
+      newline = LF | ( CR LF )
+      CR = <US-ASCII CR, carriage return (13)>
+	  LF = <US-ASCII LF, linefeed (10)>
+      parameter = key ': ' value newline
+      key-data = 1*( ALPHA | DIGIT | '+' | '/' | '=' ) newline
+      UPALPHA = <any US-ASCII uppercase letter "A".."Z">
+      LOALPHA = <any US-ASCII lowercase letter "a".."z">
+      ALPHA = UPALPHA | LOALPHA
+      DIGIT = <any US-ASCII digit "0".."9">
 
     keyData    - Will not be NULL.
     passphrase - May be NULL, not covariant with whether the key is encrypted or
@@ -258,7 +291,16 @@ static CFDataRef CreateDataFromFile(char const *path) {
     
     Returns 0 if the key was populated, 1 otherwise.
  */
-static int _libssh2_rsa_new_pem_encoded_pkcs1_key(libssh2_rsa_ctx **rsa, LIBSSH2_SESSION *session, CFDataRef keyData, CFStringRef passphrase) {
+static int _libssh2_rsa_new_pem_encoded_key(libssh2_rsa_ctx **rsa, LIBSSH2_SESSION *session, CFDataRef keyData, CFStringRef passphrase) {
+  return 1;
+}
+
+/*
+    See the extensive documentation for `_libssh2_rsa_new_pem_encoded_key`.
+
+    Handles DER encoded PKCS#8 keys, there is no outer PEM encoding to unwrap.
+ */
+static int _libssh2_rsa_new_der_encoded_key(libssh2_rsa_ctx **rsa, LIBSSH2_SESSION *session, CFDataRef keyData, CFStringRef passphrase) {
   return 1;
 }
 
@@ -276,7 +318,8 @@ static int _libssh2_rsa_new_pem_encoded_pkcs1_key(libssh2_rsa_ctx **rsa, LIBSSH2
     PKCS#1 keys will always be PEM encoded, PKCS#8 keys may be PEM or DER
     encoded.
 
-    This effectively has to duplicate the functionality of `SecItemImport`.
+    This function effectively has to duplicate the functionality of
+    `SecItemImport` but without a keychain.
 
     See `impExpImportRawKey` for non-encrypted PKCS#1, and
     `impExpWrappedKeyOpenSslExport` for encrypted PKCS#1, to create the
@@ -300,7 +343,7 @@ int _libssh2_rsa_new_private(libssh2_rsa_ctx **rsa,
   // covers ASCII too.
   CFStringRef cfPassphrase = passphrase ? CFStringCreateWithCString(kCFAllocatorDefault, (char const *)passphrase, kCFStringEncodingUTF8) : NULL;
 
-  int result = _libssh2_rsa_new_pem_encoded_pkcs1_key(rsa, session, keyData, cfPassphrase);
+  int result = _libssh2_rsa_new_pem_encoded_key(rsa, session, keyData, cfPassphrase);
 
   CFRelease(cfPassphrase);
   CFRelease(keyData);
