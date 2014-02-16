@@ -572,11 +572,25 @@ int _libssh2_rsa_sha1_sign(LIBSSH2_SESSION *session,
     return 1;
   }
 
+  CSSM_DATA plaintext = {
+    .Length = hash_len,
+    .Data = (uint8_t *)hash,
+  };
 
+  CSSM_DATA signatureData = {};
+
+  error = CSSM_SignData(context, &plaintext, 1, CSSM_ALGID_NONE, &signatureData);
 
   CSSM_DeleteContext(context);
 
-  return 1;
+  if (error != CSSM_OK) {
+    return 1;
+  }
+
+  *signature_len = signatureData.Length;
+  *signature = signatureData.Data;
+
+  return 0;
 }
 
 #pragma mark - DSA
