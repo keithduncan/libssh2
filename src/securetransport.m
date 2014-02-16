@@ -271,6 +271,33 @@ static NSData *dataReadUptoIncluding(NSData *data, NSUInteger *cursor, NSData *s
   return subdata;
 }
 
+static NSArray *dataReadHeaders(NSData *data, NSUInteger *cursor) {
+  NSData *headersData = dataReadUptoIncluding(data, cursor, [@"\n\n" dataUsingEncoding:NSUTF8StringEncoding]);
+  if (headersData == nil) {
+    headersData = dataReadUptoIncluding(data, cursor, [@"\r\n\r\n" dataUsingEncoding:NSUTF8StringEncoding]);
+  }
+  if (headersData == nil) {
+    return nil;
+  }
+
+  NSMutableArray *headers = [NSMutableArray array];
+
+  NSUInteger headersCursor = 0;
+  while (!dataReadNewline(headersData, &headersCursor)) {
+    if (headersCursor == [headersData length]) {
+      break;
+    }
+
+    NSData *currentHeader = dataReadUptoIncluding(headersData, &headersCursor, [@"\n" dataUsingEncoding:NSUTF8StringEncoding]);
+    if (currentHeader == nil) {
+      break;
+    }
+    [headers addObject:currentHeader];
+  }
+
+  return headers;
+}
+
 static NSCharacterSet *base64CharacterSet(void) {
   static NSCharacterSet *characterSet = nil;
   static dispatch_once_t characterSetPredicate = 0;
@@ -338,19 +365,7 @@ static int _libssh2_decode_pem(NSData *pemData, NSData *header, NSData *footer, 
     return 1;
   }
 
-  NSMutableArray *readHeaders = [NSMutableArray array];
-  while (!dataReadNewline(pemData, &cursor)) {
-    if (cursor == [pemData length]) {
-      return 1;
-    }
-
-    NSData *currentHeader = dataReadUptoIncluding(pemData, &cursor, [@"\n" dataUsingEncoding:NSUTF8StringEncoding]);
-    if (currentHeader == nil) {
-      return 1;
-    }
-    [readHeaders addObject:currentHeader];
-  }
-  *headers = readHeaders;
+  *headers = dataReadHeaders(pemData, &cursor);
 
   NSMutableData *base64Data = [NSMutableData data];
   NSData *base64Line = nil;
