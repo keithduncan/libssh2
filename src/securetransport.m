@@ -243,7 +243,7 @@ int _libssh2_rsa_new(libssh2_rsa_ctx **rsa,
       key = header newline [ *parameter newline ] 1*key-data footer
       newline = LF | ( CR LF )
       CR = <US-ASCII CR, carriage return (13)>
-	  LF = <US-ASCII LF, linefeed (10)>
+      LF = <US-ASCII LF, linefeed (10)>
       parameter = key ': ' value newline
       key-data = 1*( ALPHA | DIGIT | '+' | '/' | '=' ) newline
       UPALPHA = <any US-ASCII uppercase letter "A".."Z">
