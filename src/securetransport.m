@@ -3,6 +3,7 @@
 #import "securetransport.h"
 
 #import <CoreFoundation/CoreFoundation.h>
+#import <Foundation/Foundation.h>
 #import <Security/SecAsn1Coder.h>
 
 #include "libssh2_priv.h"
@@ -212,41 +213,6 @@ int _libssh2_rsa_new(libssh2_rsa_ctx **rsa,
   return 0;
 }
 
-static CFDataRef CreateDataFromFile(char const *path) {
-  CFStringRef keyFilePath = CFStringCreateWithCString(kCFAllocatorDefault, path, kCFStringEncodingUTF8);
-  CFURLRef keyFileLocation = CFURLCreateWithFileSystemPath(kCFAllocatorDefault, keyFilePath, kCFURLPOSIXPathStyle, false);
-  CFRelease(keyFilePath);
-
-  CFReadStreamRef readStream = CFReadStreamCreateWithFile(kCFAllocatorDefault, keyFileLocation);
-  CFRelease(keyFileLocation);
-
-  if (!CFReadStreamOpen(readStream)) {
-    CFRelease(readStream);
-    return NULL;
-  }
-
-  CFMutableDataRef keyData = CFDataCreateMutable(kCFAllocatorDefault, 0);
-
-  size_t size = 1024;
-  uint8_t bytes[size];
-
-  while (1) {
-    CFIndex read = CFReadStreamRead(readStream, bytes, size);
-    if (read < 1) {
-      CFRelease(keyData);
-      keyData = NULL;
-      break;
-    }
-
-    CFDataAppendBytes(keyData, bytes, read);
-  }
-
-  CFReadStreamClose(readStream);
-  CFRelease(readStream);
-
-  return (CFDataRef)keyData;
-}
-
 /*
     Create an RSA key from a PEM file.
 
@@ -288,10 +254,10 @@ static CFDataRef CreateDataFromFile(char const *path) {
     keyData    - Will not be NULL.
     passphrase - May be NULL, not covariant with whether the key is encrypted or
                  not.
-    
+
     Returns 0 if the key was populated, 1 otherwise.
  */
-static int _libssh2_rsa_new_pem_encoded_key(libssh2_rsa_ctx **rsa, LIBSSH2_SESSION *session, CFDataRef keyData, CFStringRef passphrase) {
+static int _libssh2_rsa_new_pem_encoded_key(libssh2_rsa_ctx **rsa, LIBSSH2_SESSION *session, NSData *keyData, NSString *passphrase) {
   return 1;
 }
 
@@ -300,7 +266,7 @@ static int _libssh2_rsa_new_pem_encoded_key(libssh2_rsa_ctx **rsa, LIBSSH2_SESSI
 
     Handles DER encoded PKCS#8 keys, there is no outer PEM encoding to unwrap.
  */
-static int _libssh2_rsa_new_der_encoded_key(libssh2_rsa_ctx **rsa, LIBSSH2_SESSION *session, CFDataRef keyData, CFStringRef passphrase) {
+static int _libssh2_rsa_new_der_encoded_key(libssh2_rsa_ctx **rsa, LIBSSH2_SESSION *session, NSData *keyData, NSString *passphrase) {
   return 1;
 }
 
@@ -330,25 +296,21 @@ static int _libssh2_rsa_new_der_encoded_key(libssh2_rsa_ctx **rsa, LIBSSH2_SESSI
 
     Returns 0 if the key is created, 1 otherwise.
 */
-int _libssh2_rsa_new_private(libssh2_rsa_ctx **rsa,
-                             LIBSSH2_SESSION *session,
-                             char const *filename,
-                             unsigned char const *passphrase) {
-  CFDataRef keyData = CreateDataFromFile(filename);
-  if (keyData == NULL) {
-    return 1;
+int _libssh2_rsa_new_private(libssh2_rsa_ctx **rsa, LIBSSH2_SESSION *session, char const *filename, unsigned char const *passphrase) {
+  @autoreleasepool {
+    NSData *keyData = [NSData dataWithContentsOfFile:@(filename) options:0 error:NULL];
+    if (keyData == NULL) {
+      return 1;
+    }
+
+    // UTF-8 may not be the correct encoding here, but a good guess given that
+    // it covers ASCII too.
+    NSString *nsPassphrase = passphrase ? [NSString stringWithCString:(char const *)passphrase encoding:NSUTF8StringEncoding] : NULL;
+
+    int result = _libssh2_rsa_new_pem_encoded_key(rsa, session, keyData, nsPassphrase);
+
+    return result;
   }
-
-  // UTF-8 may not be the correct encoding here, but a good guess given that it
-  // covers ASCII too.
-  CFStringRef cfPassphrase = passphrase ? CFStringCreateWithCString(kCFAllocatorDefault, (char const *)passphrase, kCFStringEncodingUTF8) : NULL;
-
-  int result = _libssh2_rsa_new_pem_encoded_key(rsa, session, keyData, cfPassphrase);
-
-  CFRelease(cfPassphrase);
-  CFRelease(keyData);
-
-  return result;
 }
 
 int _libssh2_rsa_free(libssh2_rsa_ctx *rsactx) {
