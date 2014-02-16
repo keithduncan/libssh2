@@ -134,7 +134,6 @@ int _libssh2_rsa_new(libssh2_rsa_ctx **rsa,
       .Format = CSSM_KEYBLOB_RAW_FORMAT_PKCS1,
       .AlgorithmId = CSSM_ALGID_RSA,
       .KeyClass = CSSM_KEYCLASS_PRIVATE_KEY,
-      .LogicalKeySizeInBits = 0, // FIXME
       .KeyUsage = (CSSM_KEYUSE_SIGN | CSSM_KEYUSE_VERIFY),
     },
   };
