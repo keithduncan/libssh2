@@ -238,8 +238,118 @@ static BOOL dataHasPrefix(NSData *data, NSData *prefix) {
   return [data rangeOfData:prefix options:NSDataSearchAnchored range:NSMakeRange(0, [data length])].location == 0;
 }
 
+static BOOL dataReadNext(NSData *data, NSUInteger *cursor, NSData *match) {
+  NSRange range = [data rangeOfData:match options:NSDataSearchAnchored range:NSMakeRange(*cursor, [data length] - *cursor)];
+  if (range.location == NSNotFound) {
+    return NO;
+  }
+
+  *cursor = NSMaxRange(range);
+  return YES;
+}
+
+static BOOL dataReadNewline(NSData *data, NSUInteger *cursor) {
+  return dataReadNext(data, cursor, [@"\n" dataUsingEncoding:NSUTF8StringEncoding]) || dataReadNext(data, cursor, [@"\r\n" dataUsingEncoding:NSUTF8StringEncoding]);
+}
+
+static NSData *dataReadUptoIncluding(NSData *data, NSUInteger *cursor, NSData *suffix) {
+  NSRange suffixRange = [data rangeOfData:suffix options:0 range:NSMakeRange(*cursor, [data length] - *cursor)];
+  if (suffixRange.location == NSNotFound) {
+    return nil;
+  }
+
+  NSUInteger newCursor = NSMaxRange(suffixRange);
+  NSData *subdata = [data subdataWithRange:NSMakeRange(*cursor, newCursor - *cursor)];
+  *cursor = newCursor;
+
+  return subdata;
+}
+
+static NSCharacterSet *base64CharacterSet(void) {
+  static NSCharacterSet *characterSet = nil;
+  static dispatch_once_t characterSetPredicate = 0;
+  dispatch_once(&characterSetPredicate, ^{
+    NSMutableCharacterSet *newCharacterSet = [[NSMutableCharacterSet alloc] init];
+    [newCharacterSet addCharactersInString:@"abcdefghijklmnopqrstuvwxyz"];
+    [newCharacterSet addCharactersInString:@"ABCDEFGHIJKLMNOPQRSTUVWXYZ"];
+    [newCharacterSet addCharactersInString:@"0123456789"];
+    [newCharacterSet addCharactersInString:@"+/="];
+    characterSet = newCharacterSet;
+  });
+  return characterSet;
+}
+
+static NSData *dataReadCharacterFromSet(NSData *data, NSUInteger *cursor, NSCharacterSet *characterSet) {
+  
+}
+
+static NSData *dataReadBase64Line(NSData *data, NSUInteger *cursor) {
+  NSUInteger originalCursor = *cursor;
+
+  NSMutableData *line = [NSMutableData data];
+  NSData *character = nil;
+  while ((character = dataReadCharacterFromSet(data, cursor, base64CharacterSet()))) {
+    [line appendData:character];
+  }
+  if (!dataReadNewline(data, cursor)) {
+    *cursor = originalCursor;
+    return nil;
+  }
+
+  return line;
+}
+
+static int _libssh2_decode_pem(NSData *pemData, NSData *header, NSData *footer, NSArray **headers, NSData **binary) {
+  NSUInteger cursor = 0;
+
+  if (!dataReadNext(pemData, &cursor, header)) {
+    return 1;
+  }
+  if (!dataReadNewline(pemData, &cursor)) {
+    return 1;
+  }
+
+  NSMutableArray *readHeaders = [NSMutableArray array];
+  while (!dataReadNewline(pemData, &cursor)) {
+    if (cursor == [pemData length]) {
+      return 1;
+    }
+
+    NSData *currentHeader = dataReadUptoIncluding(pemData, &cursor, [@"\n" dataUsingEncoding:NSUTF8StringEncoding]);
+    if (currentHeader == nil) {
+      return 1;
+    }
+    [readHeaders addObject:currentHeader];
+  }
+  *headers = readHeaders;
+
+  NSMutableArray *base64Lines = [NSMutableArray array];
+  NSData *base64Line = nil;
+  while ((base64Line = dataReadBase64Line(pemData, &cursor))) {
+    [base64Lines addObject:base64Line];
+  }
+  if (base64Lines == 0) {
+    return 1;
+  }
+
+  if (!dataReadNext(pemData, &cursor, footer)) {
+    return 1;
+  }
+
+  return 0;
+}
+
 static int _libssh2_rsa_new_pem_encoded_pkcs1_key(libssh2_rsa_ctx **rsa, LIBSSH2_SESSION *session, NSData *keyData, NSString *passphrase) {
-  return 1;
+  NSArray *headers = nil;
+  NSData *binary = nil;
+  int decode = _libssh2_decode_pem(keyData, _libssh2_pkcs1_header(), _libssh2_pkcs1_footer(), &headers, &binary);
+  if (decode != 0) {
+    return decode;
+  }
+
+
+
+  return 0;
 }
 
 static int _libssh2_rsa_new_pem_encoded_pkcs8_key(libssh2_rsa_ctx **rsa, LIBSSH2_SESSION *session, NSData *keyData, NSString *passphrase) {
@@ -291,12 +401,12 @@ static int _libssh2_rsa_new_pem_encoded_pkcs8_key(libssh2_rsa_ctx **rsa, LIBSSH2
     Returns 0 if the key was populated, 1 otherwise.
  */
 static int _libssh2_rsa_new_pem_encoded_key(libssh2_rsa_ctx **rsa, LIBSSH2_SESSION *session, NSData *keyData, NSString *passphrase) {
-  if (dataHasPrefix(keyData, _libssh2_pkcs1_header())) {
-    return _libssh2_rsa_new_pem_encoded_pkcs1_key(rsa, session, keyData, passphrase);
+  if (_libssh2_rsa_new_pem_encoded_pkcs1_key(rsa, session, keyData, passphrase) == 0) {
+    return 0;
   }
 
-  if (dataHasPrefix(keyData, _libssh2_pkcs8_header()) || dataHasPrefix(keyData, _libssh2_pkcs8_encrypted_header())) {
-    return _libssh2_rsa_new_pem_encoded_pkcs8_key(rsa, session, keyData, passphrase);
+  if (_libssh2_rsa_new_pem_encoded_pkcs8_key(rsa, session, keyData, passphrase) == 0) {
+    return 0;
   }
 
   return 1;
