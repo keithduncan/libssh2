@@ -79,7 +79,7 @@ static int _libssh2_rsa_new_from_pkcs1_raw_blob(libssh2_rsa_ctx **rsa, NSData *b
       .Format = CSSM_KEYBLOB_RAW_FORMAT_PKCS1,
       .AlgorithmId = CSSM_ALGID_RSA,
       .KeyClass = CSSM_KEYCLASS_PRIVATE_KEY,
-      .KeyUsage = (CSSM_KEYUSE_SIGN | CSSM_KEYUSE_VERIFY),
+      .KeyUsage = CSSM_KEYUSE_ANY,
     },
     .KeyData = {
       .Length = [blob length],
