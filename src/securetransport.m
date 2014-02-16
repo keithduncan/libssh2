@@ -213,6 +213,18 @@ int _libssh2_rsa_new(libssh2_rsa_ctx **rsa,
   return 0;
 }
 
+static BOOL dataHasPrefix(NSData *data, NSData *prefix) {
+  return [data rangeOfData:prefix options:NSDataSearchAnchored range:NSMakeRange(0, [data length])].location == 0;
+}
+
+static int _libssh2_rsa_new_pem_encoded_pkcs1_key(libssh2_rsa_ctx **rsa, LIBSSH2_SESSION *session, NSData *keyData, NSString *passphrase) {
+  return 1;
+}
+
+static int _libssh2_rsa_new_pem_encoded_pkcs8_key(libssh2_rsa_ctx **rsa, LIBSSH2_SESSION *session, NSData *keyData, NSString *passphrase) {
+  return 1;
+}
+
 /*
     Create an RSA key from a PEM file.
 
@@ -258,6 +270,17 @@ int _libssh2_rsa_new(libssh2_rsa_ctx **rsa,
     Returns 0 if the key was populated, 1 otherwise.
  */
 static int _libssh2_rsa_new_pem_encoded_key(libssh2_rsa_ctx **rsa, LIBSSH2_SESSION *session, NSData *keyData, NSString *passphrase) {
+  NSData *pkcs1Header = [@"-----BEGIN RSA PRIVATE KEY-----" dataUsingEncoding:NSUTF8StringEncoding];
+  if (dataHasPrefix(keyData, pkcs1Header)) {
+    return _libssh2_rsa_new_pem_encoded_pkcs1_key(rsa, session, keyData, passphrase);
+  }
+
+  NSData *nonEncryptedPkcs8Header = [@"-----BEGIN PRIVATE KEY-----" dataUsingEncoding:NSUTF8StringEncoding];
+  NSData *encryptedPkcs8Header = [@"-----BEGIN ENCRYPTED PRIVATE KEY-----" dataUsingEncoding:NSUTF8StringEncoding];
+  if (dataHasPrefix(keyData, nonEncryptedPkcs8Header) || dataHasPrefix(keyData, encryptedPkcs8Header)) {
+    return _libssh2_rsa_new_pem_encoded_pkcs8_key(rsa, session, keyData, passphrase);
+  }
+
   return 1;
 }
 
@@ -307,9 +330,7 @@ int _libssh2_rsa_new_private(libssh2_rsa_ctx **rsa, LIBSSH2_SESSION *session, ch
     // it covers ASCII too.
     NSString *nsPassphrase = passphrase ? [NSString stringWithCString:(char const *)passphrase encoding:NSUTF8StringEncoding] : NULL;
 
-    int result = _libssh2_rsa_new_pem_encoded_key(rsa, session, keyData, nsPassphrase);
-
-    return result;
+    return _libssh2_rsa_new_pem_encoded_key(rsa, session, keyData, nsPassphrase);
   }
 }
 
