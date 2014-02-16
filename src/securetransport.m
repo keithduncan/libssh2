@@ -88,7 +88,10 @@ static int _libssh2_rsa_new_from_pkcs1_raw_blob(libssh2_rsa_ctx **rsa, NSData *b
   };
 
   CSSM_KEY_SIZE keySize = {};
-  CSSM_QueryKeySizeInBits(_libssh2_cdsa_csp, 0, &privateKey, &keySize);
+  CSSM_RETURN error = CSSM_QueryKeySizeInBits(_libssh2_cdsa_csp, CSSM_INVALID_HANDLE, &privateKey, &keySize);
+  if (error != CSSM_OK) {
+    return 1;
+  }
   privateKey.KeyHeader.LogicalKeySizeInBits = keySize.LogicalKeySizeInBits;
 
   *rsa = malloc(sizeof(privateKey));
