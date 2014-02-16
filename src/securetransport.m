@@ -71,6 +71,32 @@ void libssh2_crypto_exit(void) {
 
 #pragma mark - RSA
 
+static int _libssh2_rsa_new_from_pkcs1_raw_blob(libssh2_rsa_ctx **rsa, NSData *blob) {
+  CSSM_KEY privateKey = {
+    .KeyHeader = {
+      .HeaderVersion = CSSM_KEYHEADER_VERSION,
+      .BlobType = CSSM_KEYBLOB_RAW,
+      .Format = CSSM_KEYBLOB_RAW_FORMAT_PKCS1,
+      .AlgorithmId = CSSM_ALGID_RSA,
+      .KeyClass = CSSM_KEYCLASS_PRIVATE_KEY,
+      .KeyUsage = (CSSM_KEYUSE_SIGN | CSSM_KEYUSE_VERIFY),
+    },
+  };
+
+  CSSM_KEY_SIZE keySize = {};
+  CSSM_QueryKeySizeInBits(_libssh2_cdsa_csp, 0, &privateKey, &keySize);
+  privateKey.KeyHeader.LogicalKeySizeInBits = keySize.LogicalKeySizeInBits;
+
+  *rsa = malloc(sizeof(privateKey));
+  memmove(&((*rsa)->KeyHeader), &privateKey.KeyHeader, sizeof(privateKey.KeyHeader));
+
+  (*rsa)->KeyData.Length = [blob length];
+  (*rsa)->KeyData.Data = malloc(privateKey.KeyData.Length);
+  [blob getBytes:(*rsa)->KeyData.Data length:[blob length]];
+
+  return 0;
+}
+
 // <http://tools.ietf.org/html/rfc3447#appendix-A.1.2>
 typedef struct {
   CSSM_DATA version; // RSA_Version_TwoPrime
@@ -127,17 +153,6 @@ int _libssh2_rsa_new(libssh2_rsa_ctx **rsa,
                      unsigned long e2len,
                      unsigned char const *coeffdata,
                      unsigned long coefflen) {
-  CSSM_KEY privateKey = {
-    .KeyHeader = {
-      .HeaderVersion = CSSM_KEYHEADER_VERSION,
-      .BlobType = CSSM_KEYBLOB_RAW,
-      .Format = CSSM_KEYBLOB_RAW_FORMAT_PKCS1,
-      .AlgorithmId = CSSM_ALGID_RSA,
-      .KeyClass = CSSM_KEYCLASS_PRIVATE_KEY,
-      .KeyUsage = (CSSM_KEYUSE_SIGN | CSSM_KEYUSE_VERIFY),
-    },
-  };
-
   /*
       Convert the raw numeric binary data to PKCS#1 format, create a CSSM_KEY
       with the result.
@@ -190,26 +205,18 @@ int _libssh2_rsa_new(libssh2_rsa_ctx **rsa,
     return 1;
   }
 
-  error = SecAsn1EncodeItem(coder, &privateKeyData, _libssh2_RSA_private_key_PKCS1_template, &privateKey.KeyData);
+  CSSM_DATA keyData = {};
+  error = SecAsn1EncodeItem(coder, &privateKeyData, _libssh2_RSA_private_key_PKCS1_template, &keyData);
   if (error != noErr) {
     SecAsn1CoderRelease(coder);
     return 1;
   }
 
-  CSSM_KEY_SIZE keySize = {};
-  CSSM_QueryKeySizeInBits(_libssh2_cdsa_csp, 0, &privateKey, &keySize);
-  privateKey.KeyHeader.LogicalKeySizeInBits = keySize.LogicalKeySizeInBits;
-
-  *rsa = malloc(sizeof(privateKey));
-  memmove(&((*rsa)->KeyHeader), &privateKey.KeyHeader, sizeof(privateKey.KeyHeader));
-
-  (*rsa)->KeyData.Length = privateKey.KeyData.Length;
-  (*rsa)->KeyData.Data = malloc(privateKey.KeyData.Length);
-  memmove((*rsa)->KeyData.Data, privateKey.KeyData.Data, privateKey.KeyData.Length);
+  int createKey = _libssh2_rsa_new_from_pkcs1_raw_blob(rsa, [NSData dataWithBytes:keyData.Data length:keyData.Length]);
 
   SecAsn1CoderRelease(coder);
 
-  return 0;
+  return createKey;
 }
 
 static NSData *_libssh2_pkcs1_header(void) {
@@ -371,9 +378,11 @@ static int _libssh2_rsa_new_pem_encoded_pkcs1_key(libssh2_rsa_ctx **rsa, LIBSSH2
     return decode;
   }
 
+  if ([headers count] != 0) {
+    return 1;
+  }
 
-
-  return 0;
+  return _libssh2_rsa_new_from_pkcs1_raw_blob(rsa, binary);
 }
 
 static int _libssh2_rsa_new_pem_encoded_pkcs8_key(libssh2_rsa_ctx **rsa, LIBSSH2_SESSION *session, NSData *keyData, NSString *passphrase) {
