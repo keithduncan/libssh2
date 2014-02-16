@@ -81,6 +81,10 @@ static int _libssh2_rsa_new_from_pkcs1_raw_blob(libssh2_rsa_ctx **rsa, NSData *b
       .KeyClass = CSSM_KEYCLASS_PRIVATE_KEY,
       .KeyUsage = (CSSM_KEYUSE_SIGN | CSSM_KEYUSE_VERIFY),
     },
+    .KeyData = {
+      .Length = [blob length],
+      .Data = (uint8_t *)[blob bytes],
+    },
   };
 
   CSSM_KEY_SIZE keySize = {};
@@ -88,11 +92,12 @@ static int _libssh2_rsa_new_from_pkcs1_raw_blob(libssh2_rsa_ctx **rsa, NSData *b
   privateKey.KeyHeader.LogicalKeySizeInBits = keySize.LogicalKeySizeInBits;
 
   *rsa = malloc(sizeof(privateKey));
+
   memmove(&((*rsa)->KeyHeader), &privateKey.KeyHeader, sizeof(privateKey.KeyHeader));
 
-  (*rsa)->KeyData.Length = [blob length];
+  (*rsa)->KeyData.Length = privateKey.KeyData.Length;
   (*rsa)->KeyData.Data = malloc(privateKey.KeyData.Length);
-  [blob getBytes:(*rsa)->KeyData.Data length:[blob length]];
+  memmove((*rsa)->KeyData.Data, privateKey.KeyData.Data, privateKey.KeyData.Length);
 
   return 0;
 }
