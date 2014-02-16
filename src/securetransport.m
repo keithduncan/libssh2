@@ -318,7 +318,7 @@ static NSData *dataReadCharactersFromSet(NSData *data, NSUInteger *cursor, NSCha
   uint8_t const *bytes = [data bytes];
   NSUInteger length = [data length];
 
-  while (*cursor > length) {
+  while (*cursor < length) {
     uint8_t character = *(bytes + *cursor);
     if (![characterSet characterIsMember:character]) {
       break;
