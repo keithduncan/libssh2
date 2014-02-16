@@ -279,24 +279,47 @@ static NSCharacterSet *base64CharacterSet(void) {
   return characterSet;
 }
 
-static NSData *dataReadCharacterFromSet(NSData *data, NSUInteger *cursor, NSCharacterSet *characterSet) {
-  
+static NSData *dataReadCharactersFromSet(NSData *data, NSUInteger *cursor, NSCharacterSet *characterSet) {
+  NSRange subrange = NSMakeRange(NSNotFound, 0);
+
+  uint8_t const *bytes = [data bytes];
+  NSUInteger length = [data length];
+
+  while (*cursor > length) {
+    uint8_t character = *(bytes + *cursor);
+    if (![characterSet characterIsMember:character]) {
+      break;
+    }
+
+    if (subrange.location == NSNotFound) {
+      subrange.location = *cursor;
+      subrange.length = 1;
+    }
+    else {
+      subrange.length = subrange.length + 1;
+    }
+
+    *cursor = NSMaxRange(subrange);
+  }
+
+  if (subrange.location == NSNotFound) {
+    return nil;
+  }
+
+  return [data subdataWithRange:subrange];
 }
 
 static NSData *dataReadBase64Line(NSData *data, NSUInteger *cursor) {
   NSUInteger originalCursor = *cursor;
 
-  NSMutableData *line = [NSMutableData data];
-  NSData *character = nil;
-  while ((character = dataReadCharacterFromSet(data, cursor, base64CharacterSet()))) {
-    [line appendData:character];
-  }
+  NSData *characters = dataReadCharactersFromSet(data, cursor, base64CharacterSet());
+
   if (!dataReadNewline(data, cursor)) {
     *cursor = originalCursor;
     return nil;
   }
 
-  return line;
+  return characters;
 }
 
 static int _libssh2_decode_pem(NSData *pemData, NSData *header, NSData *footer, NSArray **headers, NSData **binary) {
@@ -323,14 +346,16 @@ static int _libssh2_decode_pem(NSData *pemData, NSData *header, NSData *footer, 
   }
   *headers = readHeaders;
 
-  NSMutableArray *base64Lines = [NSMutableArray array];
+  NSMutableData *base64Data = [NSMutableData data];
   NSData *base64Line = nil;
   while ((base64Line = dataReadBase64Line(pemData, &cursor))) {
-    [base64Lines addObject:base64Line];
+    [base64Data appendData:base64Line];
   }
-  if (base64Lines == 0) {
+  if ([base64Data length] == 0) {
     return 1;
   }
+
+  *binary = [[NSData alloc] initWithBase64EncodedData:base64Data options:0];
 
   if (!dataReadNext(pemData, &cursor, footer)) {
     return 1;
