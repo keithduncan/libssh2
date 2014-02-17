@@ -526,6 +526,9 @@ int _libssh2_rsa_free(libssh2_rsa_ctx *rsactx) {
   return 0;
 }
 
+extern OSStatus SecKeyCreateWithCSSMKey(const CSSM_KEY *key, SecKeyRef* keyRef);
+extern const char *cssmErrorString(CSSM_RETURN error);
+
 int _libssh2_rsa_sha1_verify(libssh2_rsa_ctx *rsa,
                              unsigned char const *sig,
                              unsigned long sig_len,
@@ -533,9 +536,6 @@ int _libssh2_rsa_sha1_verify(libssh2_rsa_ctx *rsa,
                              unsigned long m_len) {
   return 1;
 }
-
-extern OSStatus SecKeyCreateWithCSSMKey(const CSSM_KEY *key, SecKeyRef* keyRef);
-extern const char *cssmErrorString(CSSM_RETURN error);
 
 int _libssh2_rsa_sha1_sign(LIBSSH2_SESSION *session,
                            libssh2_rsa_ctx *rsactx,
