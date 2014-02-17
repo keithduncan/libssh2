@@ -567,21 +567,10 @@ int _libssh2_rsa_sha1_sign(LIBSSH2_SESSION *session,
                            size_t hash_len,
                            unsigned char **signature,
                            size_t *signature_len) {
-  CSSM_ACCESS_CREDENTIALS const *credentials = NULL;
-
-  SecKeyRef key = NULL;
-  OSStatus keyError = SecKeyCreateWithCSSMKey(rsactx, &key);
-  if (keyError != errSecSuccess) {
-    return 1;
-  }
-
-  keyError = SecKeyGetCredentials(key, CSSM_ACL_AUTHORIZATION_SIGN, kSecCredentialTypeDefault, &credentials);
-  if (keyError != errSecSuccess) {
-    return 1;
-  }
+  CSSM_ACCESS_CREDENTIALS credentials = {};
 
   CSSM_CC_HANDLE context = CSSM_INVALID_HANDLE;
-  CSSM_RETURN error = CSSM_CSP_CreateSignatureContext(_libssh2_cdsa_csp, CSSM_ALGID_RSA, credentials, rsactx, &context);
+  CSSM_RETURN error = CSSM_CSP_CreateSignatureContext(_libssh2_cdsa_csp, CSSM_ALGID_RSA, &credentials, rsactx, &context);
   if (error != CSSM_OK) {
     return 1;
   }
