@@ -71,14 +71,14 @@ void libssh2_crypto_exit(void) {
 
 #pragma mark - RSA
 
-static int _libssh2_rsa_new_from_pkcs1_raw_blob(libssh2_rsa_ctx **rsa, NSData *blob) {
-  CSSM_KEY privateKey = {
+static int _libssh2_rsa_new_from_pkcs1_raw_blob(CSSM_KEY **keyRef, CSSM_KEYCLASS keyClass, NSData *blob) {
+  CSSM_KEY key = {
     .KeyHeader = {
       .HeaderVersion = CSSM_KEYHEADER_VERSION,
       .BlobType = CSSM_KEYBLOB_RAW,
       .Format = CSSM_KEYBLOB_RAW_FORMAT_PKCS1,
       .AlgorithmId = CSSM_ALGID_RSA,
-      .KeyClass = CSSM_KEYCLASS_PRIVATE_KEY,
+      .KeyClass = keyClass,
       .KeyUsage = CSSM_KEYUSE_ANY,
     },
     .KeyData = {
@@ -88,19 +88,19 @@ static int _libssh2_rsa_new_from_pkcs1_raw_blob(libssh2_rsa_ctx **rsa, NSData *b
   };
 
   CSSM_KEY_SIZE keySize = {};
-  CSSM_RETURN error = CSSM_QueryKeySizeInBits(_libssh2_cdsa_csp, CSSM_INVALID_HANDLE, &privateKey, &keySize);
+  CSSM_RETURN error = CSSM_QueryKeySizeInBits(_libssh2_cdsa_csp, CSSM_INVALID_HANDLE, &key, &keySize);
   if (error != CSSM_OK) {
     return 1;
   }
-  privateKey.KeyHeader.LogicalKeySizeInBits = keySize.LogicalKeySizeInBits;
+  key.KeyHeader.LogicalKeySizeInBits = keySize.LogicalKeySizeInBits;
 
-  *rsa = malloc(sizeof(privateKey));
+  *keyRef = malloc(sizeof(key));
 
-  memmove(&((*rsa)->KeyHeader), &privateKey.KeyHeader, sizeof(privateKey.KeyHeader));
+  memmove(&((*keyRef)->KeyHeader), &key.KeyHeader, sizeof(key.KeyHeader));
 
-  (*rsa)->KeyData.Length = privateKey.KeyData.Length;
-  (*rsa)->KeyData.Data = malloc(privateKey.KeyData.Length);
-  memmove((*rsa)->KeyData.Data, privateKey.KeyData.Data, privateKey.KeyData.Length);
+  (*keyRef)->KeyData.Length = key.KeyData.Length;
+  (*keyRef)->KeyData.Data = malloc(key.KeyData.Length);
+  memmove((*keyRef)->KeyData.Data, key.KeyData.Data, key.KeyData.Length);
 
   return 0;
 }
@@ -116,29 +116,65 @@ typedef struct {
   CSSM_DATA exponent1;
   CSSM_DATA exponent2;
   CSSM_DATA coefficient;
-} _libssh2_RSA_private_key_PKCS1;
+} _libssh2_RSA_PKCS1_private_key;
 
 typedef enum {
   RSA_Version_TwoPrime = 0,
   RSA_Version_Multi = 1,
 } RSA_Version;
 
-static const SecAsn1Template _libssh2_RSA_private_key_PKCS1_template[] = {
-  { .kind = SEC_ASN1_SEQUENCE, .size = sizeof(_libssh2_RSA_private_key_PKCS1) },
-  { .kind = SEC_ASN1_INTEGER, .offset = offsetof(_libssh2_RSA_private_key_PKCS1, version) },
-  { .kind = SEC_ASN1_INTEGER, .offset = offsetof(_libssh2_RSA_private_key_PKCS1, modulus) },
-  { .kind = SEC_ASN1_INTEGER, .offset = offsetof(_libssh2_RSA_private_key_PKCS1, publicExponent) },
-  { .kind = SEC_ASN1_INTEGER, .offset = offsetof(_libssh2_RSA_private_key_PKCS1, privateExponent) },
-  { .kind = SEC_ASN1_INTEGER, .offset = offsetof(_libssh2_RSA_private_key_PKCS1, prime1) },
-  { .kind = SEC_ASN1_INTEGER, .offset = offsetof(_libssh2_RSA_private_key_PKCS1, prime2) },
-  { .kind = SEC_ASN1_INTEGER, .offset = offsetof(_libssh2_RSA_private_key_PKCS1, exponent1) },
-  { .kind = SEC_ASN1_INTEGER, .offset = offsetof(_libssh2_RSA_private_key_PKCS1, exponent2) },
-  { .kind = SEC_ASN1_INTEGER, .offset = offsetof(_libssh2_RSA_private_key_PKCS1, coefficient) },
+static SecAsn1Template const _libssh2_RSA_PKCS1_private_key_template[] = {
+  { .kind = SEC_ASN1_SEQUENCE, .size = sizeof(_libssh2_RSA_PKCS1_private_key) },
+  { .kind = SEC_ASN1_INTEGER, .offset = offsetof(_libssh2_RSA_PKCS1_private_key, version) },
+  { .kind = SEC_ASN1_INTEGER, .offset = offsetof(_libssh2_RSA_PKCS1_private_key, modulus) },
+  { .kind = SEC_ASN1_INTEGER, .offset = offsetof(_libssh2_RSA_PKCS1_private_key, publicExponent) },
+  { .kind = SEC_ASN1_INTEGER, .offset = offsetof(_libssh2_RSA_PKCS1_private_key, privateExponent) },
+  { .kind = SEC_ASN1_INTEGER, .offset = offsetof(_libssh2_RSA_PKCS1_private_key, prime1) },
+  { .kind = SEC_ASN1_INTEGER, .offset = offsetof(_libssh2_RSA_PKCS1_private_key, prime2) },
+  { .kind = SEC_ASN1_INTEGER, .offset = offsetof(_libssh2_RSA_PKCS1_private_key, exponent1) },
+  { .kind = SEC_ASN1_INTEGER, .offset = offsetof(_libssh2_RSA_PKCS1_private_key, exponent2) },
+  { .kind = SEC_ASN1_INTEGER, .offset = offsetof(_libssh2_RSA_PKCS1_private_key, coefficient) },
   { },
 };
 
+typedef struct {
+  CSSM_DATA modulus;
+  CSSM_DATA publicExponent;
+} _libssh2_RSA_PKCS1_public_key;
+
+static SecAsn1Template const _libssh2_RSA_PKCS1_public_key_template[] = {
+  { .kind = SEC_ASN1_SEQUENCE, .size = sizeof(_libssh2_RSA_PKCS1_public_key) },
+  { .kind = SEC_ASN1_INTEGER, .offset = offsetof(_libssh2_RSA_PKCS1_public_key, modulus) },
+  { .kind = SEC_ASN1_INTEGER, .offset = offsetof(_libssh2_RSA_PKCS1_public_key, publicExponent) },
+  { },
+};
+
+static int _libssh2_rsa_new_from_binary_template(libssh2_rsa_ctx **rsa,
+                                                 CSSM_KEYCLASS keyClass,
+                                                 void const *bytes,
+                                                 SecAsn1Template const *templates) {
+  SecAsn1CoderRef coder = NULL;
+  OSStatus error = SecAsn1CoderCreate(&coder);
+  if (error != noErr) {
+    return 1;
+  }
+
+  CSSM_DATA keyData = {};
+  error = SecAsn1EncodeItem(coder, bytes, templates, &keyData);
+  if (error != noErr) {
+    SecAsn1CoderRelease(coder);
+    return 1;
+  }
+
+  int createKey = _libssh2_rsa_new_from_pkcs1_raw_blob(rsa, keyClass, [NSData dataWithBytes:keyData.Data length:keyData.Length]);
+
+  SecAsn1CoderRelease(coder);
+
+  return createKey;
+}
+
 /*
-    Create an RSA key from the raw numeric components.
+    Create an RSA private key from the raw numeric components.
 
     version, e, n, d, p, q, e1, e2, coeff - positive integer in big-endian form.
 
@@ -168,7 +204,7 @@ int _libssh2_rsa_new(libssh2_rsa_ctx **rsa,
 
    uint8_t version = RSA_Version_TwoPrime;
 
-  _libssh2_RSA_private_key_PKCS1 privateKeyData = {
+  _libssh2_RSA_PKCS1_private_key keyData = {
     .version = {
       .Length = sizeof(version),
       .Data = &version,
@@ -207,44 +243,63 @@ int _libssh2_rsa_new(libssh2_rsa_ctx **rsa,
     },
   };
 
-  SecAsn1CoderRef coder = NULL;
-  OSStatus error = SecAsn1CoderCreate(&coder);
-  if (error != noErr) {
-    return 1;
-  }
-
-  CSSM_DATA keyData = {};
-  error = SecAsn1EncodeItem(coder, &privateKeyData, _libssh2_RSA_private_key_PKCS1_template, &keyData);
-  if (error != noErr) {
-    SecAsn1CoderRelease(coder);
-    return 1;
-  }
-
-  int createKey = _libssh2_rsa_new_from_pkcs1_raw_blob(rsa, [NSData dataWithBytes:keyData.Data length:keyData.Length]);
-
-  SecAsn1CoderRelease(coder);
-
-  return createKey;
+  return _libssh2_rsa_new_from_binary_template(rsa, CSSM_KEYCLASS_PRIVATE_KEY, &keyData, _libssh2_RSA_PKCS1_private_key_template);
 }
 
-static NSData *_libssh2_pkcs1_header(void) {
+/*
+    Create an RSA private key from the raw numeric components.
+ */
+static int _libssh2_rsa_new_public(libssh2_rsa_ctx **rsa,
+                                   unsigned char const *edata,
+                                   unsigned long elen,
+                                   unsigned char const *ndata,
+                                   unsigned long nlen) {
+  _libssh2_RSA_PKCS1_public_key keyData = {
+    .modulus = {
+      .Length = nlen,
+      .Data = (uint8_t *)ndata,
+    },
+    .publicExponent = {
+      .Length = elen,
+      .Data = (uint8_t *)edata,
+    },
+  };
+  return _libssh2_rsa_new_from_binary_template(rsa, CSSM_KEYCLASS_PUBLIC_KEY, &keyData, _libssh2_RSA_PKCS1_public_key_template);
+}
+
+static NSData *_libssh2_pkcs1_rsa_private_key_header(void) {
   return [@"-----BEGIN RSA PRIVATE KEY-----" dataUsingEncoding:NSUTF8StringEncoding];
 }
-static NSData *_libssh2_pkcs1_footer(void) {
+static NSData *_libssh2_pkcs1_rsa_private_key_footer(void) {
   return [@"-----END RSA PRIVATE KEY-----" dataUsingEncoding:NSUTF8StringEncoding];
 }
 
-static NSData *_libssh2_pkcs8_header(void) {
+static NSData *_libssh2_pkcs1_rsa_public_key_header(void) {
+  return [@"-----BEGIN RSA PUBLIC KEY-----" dataUsingEncoding:NSUTF8StringEncoding];
+}
+
+static NSData *_libssh2_pkcs1_rsa_public_key_footer(void) {
+  return [@"-----END RSA PUBLIC KEY-----" dataUsingEncoding:NSUTF8StringEncoding];
+}
+
+static NSData *_libssh2_pkcs8_private_key_header(void) {
   return [@"-----BEGIN PRIVATE KEY-----" dataUsingEncoding:NSUTF8StringEncoding];
 }
-static NSData *_libssh2_pkcs8_footer(void) {
+static NSData *_libssh2_pkcs8_private_key_footer(void) {
   return [@"-----END PRIVATE KEY-----" dataUsingEncoding:NSUTF8StringEncoding];
 }
 
-static NSData *_libssh2_pkcs8_encrypted_header(void) {
+static NSData *_libssh2_pkcs8_public_key_header(void) {
+  return [@"-----BEGIN PUBLIC KEY-----" dataUsingEncoding:NSUTF8StringEncoding];
+}
+static NSData *_libssh2_pkcs8_public_key_footer(void) {
+  return [@"-----END PUBLIC KEY-----" dataUsingEncoding:NSUTF8StringEncoding];
+}
+
+static NSData *_libssh2_pkcs8_encrypted_private_key_header(void) {
   return [@"-----BEGIN ENCRYPTED PRIVATE KEY-----" dataUsingEncoding:NSUTF8StringEncoding];
 }
-static NSData *_libssh2_pkcs8_encrypted_footer(void) {
+static NSData *_libssh2_pkcs8_encrypted_private_key_footer(void) {
   return [@"-----END ENCRYPTED PRIVATE KEY-----" dataUsingEncoding:NSUTF8StringEncoding];
 }
 
@@ -393,10 +448,31 @@ static int _libssh2_decode_pem(NSData *pemData, NSData *header, NSData *footer, 
   return 0;
 }
 
-static int _libssh2_rsa_new_pem_encoded_pkcs1_key(libssh2_rsa_ctx **rsa, LIBSSH2_SESSION *session, NSData *keyData, NSString *passphrase) {
+static int _libssh2_new_pem_encoded_rsa_pkcs1_key(CSSM_KEY **keyRef, NSData *keyData, NSString *passphrase) {
+  CSSM_KEYCLASS keyClass = CSSM_KEYCLASS_OTHER;
+  if (dataHasPrefix(keyData, _libssh2_pkcs1_rsa_private_key_header())) {
+    keyClass = CSSM_KEYCLASS_PRIVATE_KEY;
+  }
+  else if (dataHasPrefix(keyData, _libssh2_pkcs1_rsa_public_key_header())) {
+    keyClass = CSSM_KEYCLASS_PUBLIC_KEY;
+  }
+  if (keyClass == CSSM_KEYCLASS_OTHER) {
+    return 1;
+  }
+
+  NSData *header, *footer;
+  if (keyClass == CSSM_KEYCLASS_PRIVATE_KEY) {
+    header = _libssh2_pkcs1_rsa_private_key_header();
+    footer = _libssh2_pkcs1_rsa_private_key_footer();
+  }
+  else if (keyClass == CSSM_KEYCLASS_PUBLIC_KEY) {
+    header = _libssh2_pkcs1_rsa_public_key_header();
+    footer = _libssh2_pkcs1_rsa_public_key_footer();
+  }
+
   NSArray *headers = nil;
   NSData *binary = nil;
-  int decode = _libssh2_decode_pem(keyData, _libssh2_pkcs1_header(), _libssh2_pkcs1_footer(), &headers, &binary);
+  int decode = _libssh2_decode_pem(keyData, header, footer, &headers, &binary);
   if (decode != 0) {
     return decode;
   }
@@ -405,10 +481,10 @@ static int _libssh2_rsa_new_pem_encoded_pkcs1_key(libssh2_rsa_ctx **rsa, LIBSSH2
     return 1;
   }
 
-  return _libssh2_rsa_new_from_pkcs1_raw_blob(rsa, binary);
+  return _libssh2_rsa_new_from_pkcs1_raw_blob(keyRef, keyClass, binary);
 }
 
-static int _libssh2_rsa_new_pem_encoded_pkcs8_key(libssh2_rsa_ctx **rsa, LIBSSH2_SESSION *session, NSData *keyData, NSString *passphrase) {
+static int _libssh2_new_pem_encoded_pkcs8_key(CSSM_KEY **keyRef, NSData *keyData, NSString *passphrase) {
   return 1;
 }
 
@@ -418,13 +494,18 @@ static int _libssh2_rsa_new_pem_encoded_pkcs8_key(libssh2_rsa_ctx **rsa, LIBSSH2
     The key data may be a PKCS#1 key (non-encrypted or encrypted [PEM headers
     will indicate the parameters]) or a PKCS#8 key.
 
-    PKCS#1 keys are bounded by the header/footer
+    PKCS#1 private keys are bounded by the header/footer
 
       For both non encrypted and encrypted keys
       -----BEGIN RSA PRIVATE KEY-----
       -----END RSA PRIVATE KEY-----
+ 
+    PKCS#1 public keys are bounded by the header/footer
+ 
+      -----BEGIN RSA PUBLIC KEY-----
+      -----END RSA PUBLIC KEY-----
 
-    PKCS#8 keys are bounded by the header/footer
+    PKCS#8 private keys are bounded by the header/footer
 
       For a non-encrypted key
       -----BEGIN PRIVATE KEY-----
@@ -433,11 +514,16 @@ static int _libssh2_rsa_new_pem_encoded_pkcs8_key(libssh2_rsa_ctx **rsa, LIBSSH2
       For an encrypted key
       -----BEGIN ENCRYPTED PRIVATE KEY-----
       -----END ENCRYPTED PRIVATE KEY-----
+ 
+    PKCS#8 public keys are bounded by the header/footer
+ 
+      -----BEGIN PUBLIC KEY-----
+      -----END PUBLIC KEY-----
 
     Note that a PKCS#8 key may not be an RSA key, it may be another key type,
     the key type must be checked.
 
-    In both PKCS#1 and PKCS#8, the general form of the object is:
+    The general form of the PEM object is:
 
       key = header newline [ *parameter newline ] 1*key-data footer
       newline = LF | ( CR LF )
@@ -456,12 +542,12 @@ static int _libssh2_rsa_new_pem_encoded_pkcs8_key(libssh2_rsa_ctx **rsa, LIBSSH2
 
     Returns 0 if the key was populated, 1 otherwise.
  */
-static int _libssh2_rsa_new_pem_encoded_key(libssh2_rsa_ctx **rsa, LIBSSH2_SESSION *session, NSData *keyData, NSString *passphrase) {
-  if (_libssh2_rsa_new_pem_encoded_pkcs1_key(rsa, session, keyData, passphrase) == 0) {
+static int _libssh2_new_pem_encoded_key(CSSM_KEY **keyRef, NSData *keyData, NSString *passphrase) {
+  if (_libssh2_new_pem_encoded_rsa_pkcs1_key(keyRef, keyData, passphrase) == 0) {
     return 0;
   }
 
-  if (_libssh2_rsa_new_pem_encoded_pkcs8_key(rsa, session, keyData, passphrase) == 0) {
+  if (_libssh2_new_pem_encoded_pkcs8_key(keyRef, keyData, passphrase) == 0) {
     return 0;
   }
 
@@ -469,16 +555,16 @@ static int _libssh2_rsa_new_pem_encoded_key(libssh2_rsa_ctx **rsa, LIBSSH2_SESSI
 }
 
 /*
-    See the extensive documentation for `_libssh2_rsa_new_pem_encoded_key`.
+    See the extensive documentation for `_libssh2_new_pem_encoded_key`.
 
     Handles DER encoded PKCS#8 keys, there is no outer PEM encoding to unwrap.
  */
-static int _libssh2_rsa_new_der_encoded_key(libssh2_rsa_ctx **rsa, LIBSSH2_SESSION *session, NSData *keyData, NSString *passphrase) {
+static int _libssh2_new_der_encoded_key(libssh2_rsa_ctx **rsa, NSData *keyData, NSString *passphrase) {
   return 1;
 }
 
 /*
-    Create an RSA key from a file.
+    Create an RSA private key from a file.
 
     From libgcrypt.c, it only handles PEM encoded non-encrypted PKCS#1 keys.
 
@@ -514,7 +600,18 @@ int _libssh2_rsa_new_private(libssh2_rsa_ctx **rsa, LIBSSH2_SESSION *session, ch
     // it covers ASCII too.
     NSString *nsPassphrase = passphrase ? [NSString stringWithCString:(char const *)passphrase encoding:NSUTF8StringEncoding] : NULL;
 
-    return _libssh2_rsa_new_pem_encoded_key(rsa, session, keyData, nsPassphrase);
+    CSSM_KEY *key = NULL;
+    int keyError = _libssh2_new_pem_encoded_key(&key, keyData, nsPassphrase);
+    if (keyError != 0) {
+      return keyError;
+    }
+
+    if (!(key->KeyHeader.AlgorithmId == CSSM_ALGID_RSA && key->KeyHeader.KeyClass == CSSM_KEYCLASS_PRIVATE_KEY)) {
+      return 1;
+    }
+
+    *rsa = key;
+    return 0;
   }
 }
 
