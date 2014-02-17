@@ -632,14 +632,46 @@ int _libssh2_rsa_free(libssh2_rsa_ctx *rsactx) {
 extern OSStatus SecKeyCreateWithCSSMKey(const CSSM_KEY *key, SecKeyRef* keyRef);
 extern const char *cssmErrorString(CSSM_RETURN error);
 
+static int _libssh2_rsa_convert_private_key_to_public_key(CSSM_KEY *privateKey, CSSM_KEY **publicKeyRef) {
+  if (privateKey->KeyHeader.BlobType != CSSM_KEYBLOB_RAW) return 1;
+  if (privateKey->KeyHeader.Format != CSSM_KEYBLOB_RAW_FORMAT_PKCS1) return 1;
+  if (privateKey->KeyHeader.AlgorithmId != CSSM_ALGID_RSA) return 1;
+
+  SecAsn1CoderRef coder;
+  OSStatus error = SecAsn1CoderCreate(&coder);
+  if (error != errSecSuccess) {
+    return 1;
+  }
+
+  _libssh2_RSA_PKCS1_private_key privateKeyData;
+  error = SecAsn1Decode(coder, privateKey->KeyData.Data, privateKey->KeyData.Length, _libssh2_RSA_PKCS1_private_key_template, &privateKeyData);
+  if (error != errSecSuccess) {
+    return 1;
+  }
+
+  _libssh2_RSA_PKCS1_public_key publicKeyData = {
+    .modulus = privateKeyData.modulus,
+    .publicExponent = privateKeyData.publicExponent,
+  };
+
+  return _libssh2_rsa_new_from_binary_template(publicKeyRef, CSSM_KEYCLASS_PUBLIC_KEY, &publicKeyData, _libssh2_RSA_PKCS1_public_key_template);
+}
+
 int _libssh2_rsa_sha1_verify(libssh2_rsa_ctx *rsactx,
                              unsigned char const *sig,
                              unsigned long sig_len,
                              unsigned char const *m,
                              unsigned long m_len) {
+  CSSM_KEY *publicKey = NULL;
+  int publicKeyError = _libssh2_rsa_convert_private_key_to_public_key(rsactx, &publicKey);
+  if (publicKeyError != 0) {
+    return publicKeyError;
+  }
+
   CSSM_CC_HANDLE context = CSSM_INVALID_HANDLE;
-  CSSM_RETURN error = CSSM_CSP_CreateSignatureContext(_libssh2_cdsa_csp, CSSM_ALGID_RSA, NULL, rsactx, &context);
+  CSSM_RETURN error = CSSM_CSP_CreateSignatureContext(_libssh2_cdsa_csp, CSSM_ALGID_RSA, NULL, publicKey, &context);
   if (error != CSSM_OK) {
+    _libssh2_rsa_free(publicKey);
     return 1;
   }
 
@@ -656,6 +688,7 @@ int _libssh2_rsa_sha1_verify(libssh2_rsa_ctx *rsactx,
   error = CSSM_VerifyData(context, &plaintext, 1, CSSM_ALGID_NONE, &signatureData);
 
   CSSM_DeleteContext(context);
+  _libssh2_rsa_free(publicKey);
 
   if (error != CSSM_OK) {
     return 1;
