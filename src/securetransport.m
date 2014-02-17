@@ -93,18 +93,18 @@ static NSData *_libssh2_pkcs8_private_key_footer(void) {
   return [@"-----END PRIVATE KEY-----" dataUsingEncoding:NSUTF8StringEncoding];
 }
 
-static NSData *_libssh2_pkcs8_public_key_header(void) {
-  return [@"-----BEGIN PUBLIC KEY-----" dataUsingEncoding:NSUTF8StringEncoding];
-}
-static NSData *_libssh2_pkcs8_public_key_footer(void) {
-  return [@"-----END PUBLIC KEY-----" dataUsingEncoding:NSUTF8StringEncoding];
-}
-
 static NSData *_libssh2_pkcs8_encrypted_private_key_header(void) {
   return [@"-----BEGIN ENCRYPTED PRIVATE KEY-----" dataUsingEncoding:NSUTF8StringEncoding];
 }
 static NSData *_libssh2_pkcs8_encrypted_private_key_footer(void) {
   return [@"-----END ENCRYPTED PRIVATE KEY-----" dataUsingEncoding:NSUTF8StringEncoding];
+}
+
+static NSData *_libssh2_pkcs8_public_key_header(void) {
+  return [@"-----BEGIN PUBLIC KEY-----" dataUsingEncoding:NSUTF8StringEncoding];
+}
+static NSData *_libssh2_pkcs8_public_key_footer(void) {
+  return [@"-----END PUBLIC KEY-----" dataUsingEncoding:NSUTF8StringEncoding];
 }
 
 static BOOL dataHasPrefix(NSData *data, NSData *prefix) {
