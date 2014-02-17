@@ -248,6 +248,10 @@ static NSData *_libssh2_pkcs8_encrypted_footer(void) {
   return [@"-----END ENCRYPTED PRIVATE KEY-----" dataUsingEncoding:NSUTF8StringEncoding];
 }
 
+static BOOL dataHasPrefix(NSData *data, NSData *prefix) {
+  return [data rangeOfData:prefix options:NSDataSearchAnchored range:NSMakeRange(0, [data length])].location == 0;
+}
+
 static BOOL dataReadNext(NSData *data, NSUInteger *cursor, NSData *match) {
   NSRange range = [data rangeOfData:match options:NSDataSearchAnchored range:NSMakeRange(*cursor, [data length] - *cursor)];
   if (range.location == NSNotFound) {
