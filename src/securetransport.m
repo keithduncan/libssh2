@@ -803,6 +803,30 @@ void _libssh2_init_aes_ctr(void) {
 
 #pragma mark - Private Public Keys
 
+/*
+    Extract public key from private key file.
+
+    Used by libssh2 to provide a username + public key tuple to the server which
+    if the server accepts will ask the client to sign data to prove it owns the
+    corresponding private key.
+
+    session        - In parameter, non NULL.
+    method         - Out parameter, must be set upon successful return, one of
+                     "ssh-rsa" and "ssh-dss" based on whether the public key is
+                     RSA or DSA.
+    method_len     - Out parameter, must be set upon successful return, the
+                     length of the method string written out.
+    pubkeydata     - Out parameter, must be set upon successful return. See
+                     `gen_publickey_from_rsa` and `gen_publickey_from_dsa` for
+                     the respective formats expected.
+    pubkeydata_len - Out parameter, must be set upon successful return, the
+                     length of the pubkeydata written out.
+    privatekey     - File system path to the private key file, non NULL.
+    passphrase     - Passphrase for the private key file, may be NULL. Not
+                     covariant with whether the private key is encrypted.
+
+    Returns 0 if the public key is created, 1 otherwise.
+ */
 int _libssh2_pub_priv_keyfile(LIBSSH2_SESSION *session,
                               unsigned char **method,
                               size_t *method_len,
