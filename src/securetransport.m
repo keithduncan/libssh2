@@ -69,6 +69,189 @@ void libssh2_crypto_exit(void) {
   detachFromModules();
 }
 
+#pragma mark - PEM
+
+static NSData *_libssh2_pkcs1_rsa_private_key_header(void) {
+  return [@"-----BEGIN RSA PRIVATE KEY-----" dataUsingEncoding:NSUTF8StringEncoding];
+}
+static NSData *_libssh2_pkcs1_rsa_private_key_footer(void) {
+  return [@"-----END RSA PRIVATE KEY-----" dataUsingEncoding:NSUTF8StringEncoding];
+}
+
+static NSData *_libssh2_pkcs1_rsa_public_key_header(void) {
+  return [@"-----BEGIN RSA PUBLIC KEY-----" dataUsingEncoding:NSUTF8StringEncoding];
+}
+
+static NSData *_libssh2_pkcs1_rsa_public_key_footer(void) {
+  return [@"-----END RSA PUBLIC KEY-----" dataUsingEncoding:NSUTF8StringEncoding];
+}
+
+static NSData *_libssh2_pkcs8_private_key_header(void) {
+  return [@"-----BEGIN PRIVATE KEY-----" dataUsingEncoding:NSUTF8StringEncoding];
+}
+static NSData *_libssh2_pkcs8_private_key_footer(void) {
+  return [@"-----END PRIVATE KEY-----" dataUsingEncoding:NSUTF8StringEncoding];
+}
+
+static NSData *_libssh2_pkcs8_public_key_header(void) {
+  return [@"-----BEGIN PUBLIC KEY-----" dataUsingEncoding:NSUTF8StringEncoding];
+}
+static NSData *_libssh2_pkcs8_public_key_footer(void) {
+  return [@"-----END PUBLIC KEY-----" dataUsingEncoding:NSUTF8StringEncoding];
+}
+
+static NSData *_libssh2_pkcs8_encrypted_private_key_header(void) {
+  return [@"-----BEGIN ENCRYPTED PRIVATE KEY-----" dataUsingEncoding:NSUTF8StringEncoding];
+}
+static NSData *_libssh2_pkcs8_encrypted_private_key_footer(void) {
+  return [@"-----END ENCRYPTED PRIVATE KEY-----" dataUsingEncoding:NSUTF8StringEncoding];
+}
+
+static BOOL dataHasPrefix(NSData *data, NSData *prefix) {
+  return [data rangeOfData:prefix options:NSDataSearchAnchored range:NSMakeRange(0, [data length])].location == 0;
+}
+
+static BOOL dataReadNext(NSData *data, NSUInteger *cursor, NSData *match) {
+  NSRange range = [data rangeOfData:match options:NSDataSearchAnchored range:NSMakeRange(*cursor, [data length] - *cursor)];
+  if (range.location == NSNotFound) {
+    return NO;
+  }
+
+  *cursor = NSMaxRange(range);
+  return YES;
+}
+
+static BOOL dataReadNewline(NSData *data, NSUInteger *cursor) {
+  return dataReadNext(data, cursor, [@"\n" dataUsingEncoding:NSUTF8StringEncoding]) || dataReadNext(data, cursor, [@"\r\n" dataUsingEncoding:NSUTF8StringEncoding]);
+}
+
+static NSData *dataReadUptoIncluding(NSData *data, NSUInteger *cursor, NSData *suffix) {
+  NSRange suffixRange = [data rangeOfData:suffix options:0 range:NSMakeRange(*cursor, [data length] - *cursor)];
+  if (suffixRange.location == NSNotFound) {
+    return nil;
+  }
+
+  NSUInteger newCursor = NSMaxRange(suffixRange);
+  NSData *subdata = [data subdataWithRange:NSMakeRange(*cursor, newCursor - *cursor)];
+  *cursor = newCursor;
+
+  return subdata;
+}
+
+static NSArray *dataReadHeaders(NSData *data, NSUInteger *cursor) {
+  NSData *headersData = dataReadUptoIncluding(data, cursor, [@"\n\n" dataUsingEncoding:NSUTF8StringEncoding]);
+  if (headersData == nil) {
+    headersData = dataReadUptoIncluding(data, cursor, [@"\r\n\r\n" dataUsingEncoding:NSUTF8StringEncoding]);
+  }
+  if (headersData == nil) {
+    return nil;
+  }
+
+  NSMutableArray *headers = [NSMutableArray array];
+
+  NSUInteger headersCursor = 0;
+  while (!dataReadNewline(headersData, &headersCursor)) {
+    if (headersCursor == [headersData length]) {
+      break;
+    }
+
+    NSData *currentHeader = dataReadUptoIncluding(headersData, &headersCursor, [@"\n" dataUsingEncoding:NSUTF8StringEncoding]);
+    if (currentHeader == nil) {
+      break;
+    }
+    [headers addObject:currentHeader];
+  }
+
+  return headers;
+}
+
+static NSCharacterSet *base64CharacterSet(void) {
+  static NSCharacterSet *characterSet = nil;
+  static dispatch_once_t characterSetPredicate = 0;
+  dispatch_once(&characterSetPredicate, ^{
+    NSMutableCharacterSet *newCharacterSet = [[NSMutableCharacterSet alloc] init];
+    [newCharacterSet addCharactersInString:@"abcdefghijklmnopqrstuvwxyz"];
+    [newCharacterSet addCharactersInString:@"ABCDEFGHIJKLMNOPQRSTUVWXYZ"];
+    [newCharacterSet addCharactersInString:@"0123456789"];
+    [newCharacterSet addCharactersInString:@"+/="];
+    characterSet = newCharacterSet;
+  });
+  return characterSet;
+}
+
+static NSData *dataReadCharactersFromSet(NSData *data, NSUInteger *cursor, NSCharacterSet *characterSet) {
+  NSRange subrange = NSMakeRange(NSNotFound, 0);
+
+  uint8_t const *bytes = [data bytes];
+  NSUInteger length = [data length];
+
+  while (*cursor < length) {
+    uint8_t character = *(bytes + *cursor);
+    if (![characterSet characterIsMember:character]) {
+      break;
+    }
+
+    if (subrange.location == NSNotFound) {
+      subrange.location = *cursor;
+      subrange.length = 1;
+    }
+    else {
+      subrange.length = subrange.length + 1;
+    }
+
+    *cursor = NSMaxRange(subrange);
+  }
+
+  if (subrange.location == NSNotFound) {
+    return nil;
+  }
+
+  return [data subdataWithRange:subrange];
+}
+
+static NSData *dataReadBase64Line(NSData *data, NSUInteger *cursor) {
+  NSUInteger originalCursor = *cursor;
+
+  NSData *characters = dataReadCharactersFromSet(data, cursor, base64CharacterSet());
+
+  if (!dataReadNewline(data, cursor)) {
+    *cursor = originalCursor;
+    return nil;
+  }
+
+  return characters;
+}
+
+static int _libssh2_decode_pem(NSData *pemData, NSData *header, NSData *footer, NSArray **headers, NSData **binary) {
+  NSUInteger cursor = 0;
+
+  if (!dataReadNext(pemData, &cursor, header)) {
+    return 1;
+  }
+  if (!dataReadNewline(pemData, &cursor)) {
+    return 1;
+  }
+
+  *headers = dataReadHeaders(pemData, &cursor);
+
+  NSMutableData *base64Data = [NSMutableData data];
+  NSData *base64Line = nil;
+  while ((base64Line = dataReadBase64Line(pemData, &cursor))) {
+    [base64Data appendData:base64Line];
+  }
+  if ([base64Data length] == 0) {
+    return 1;
+  }
+
+  *binary = [[NSData alloc] initWithBase64EncodedData:base64Data options:0];
+
+  if (!dataReadNext(pemData, &cursor, footer)) {
+    return 1;
+  }
+
+  return 0;
+}
+
 #pragma mark - RSA
 
 static int _libssh2_rsa_new_from_pkcs1_raw_blob(CSSM_KEY **keyRef, CSSM_KEYCLASS keyClass, NSData *blob) {
@@ -265,187 +448,6 @@ static int _libssh2_rsa_new_public(libssh2_rsa_ctx **rsa,
     },
   };
   return _libssh2_rsa_new_from_binary_template(rsa, CSSM_KEYCLASS_PUBLIC_KEY, &keyData, _libssh2_RSA_PKCS1_public_key_template);
-}
-
-static NSData *_libssh2_pkcs1_rsa_private_key_header(void) {
-  return [@"-----BEGIN RSA PRIVATE KEY-----" dataUsingEncoding:NSUTF8StringEncoding];
-}
-static NSData *_libssh2_pkcs1_rsa_private_key_footer(void) {
-  return [@"-----END RSA PRIVATE KEY-----" dataUsingEncoding:NSUTF8StringEncoding];
-}
-
-static NSData *_libssh2_pkcs1_rsa_public_key_header(void) {
-  return [@"-----BEGIN RSA PUBLIC KEY-----" dataUsingEncoding:NSUTF8StringEncoding];
-}
-
-static NSData *_libssh2_pkcs1_rsa_public_key_footer(void) {
-  return [@"-----END RSA PUBLIC KEY-----" dataUsingEncoding:NSUTF8StringEncoding];
-}
-
-static NSData *_libssh2_pkcs8_private_key_header(void) {
-  return [@"-----BEGIN PRIVATE KEY-----" dataUsingEncoding:NSUTF8StringEncoding];
-}
-static NSData *_libssh2_pkcs8_private_key_footer(void) {
-  return [@"-----END PRIVATE KEY-----" dataUsingEncoding:NSUTF8StringEncoding];
-}
-
-static NSData *_libssh2_pkcs8_public_key_header(void) {
-  return [@"-----BEGIN PUBLIC KEY-----" dataUsingEncoding:NSUTF8StringEncoding];
-}
-static NSData *_libssh2_pkcs8_public_key_footer(void) {
-  return [@"-----END PUBLIC KEY-----" dataUsingEncoding:NSUTF8StringEncoding];
-}
-
-static NSData *_libssh2_pkcs8_encrypted_private_key_header(void) {
-  return [@"-----BEGIN ENCRYPTED PRIVATE KEY-----" dataUsingEncoding:NSUTF8StringEncoding];
-}
-static NSData *_libssh2_pkcs8_encrypted_private_key_footer(void) {
-  return [@"-----END ENCRYPTED PRIVATE KEY-----" dataUsingEncoding:NSUTF8StringEncoding];
-}
-
-static BOOL dataHasPrefix(NSData *data, NSData *prefix) {
-  return [data rangeOfData:prefix options:NSDataSearchAnchored range:NSMakeRange(0, [data length])].location == 0;
-}
-
-static BOOL dataReadNext(NSData *data, NSUInteger *cursor, NSData *match) {
-  NSRange range = [data rangeOfData:match options:NSDataSearchAnchored range:NSMakeRange(*cursor, [data length] - *cursor)];
-  if (range.location == NSNotFound) {
-    return NO;
-  }
-
-  *cursor = NSMaxRange(range);
-  return YES;
-}
-
-static BOOL dataReadNewline(NSData *data, NSUInteger *cursor) {
-  return dataReadNext(data, cursor, [@"\n" dataUsingEncoding:NSUTF8StringEncoding]) || dataReadNext(data, cursor, [@"\r\n" dataUsingEncoding:NSUTF8StringEncoding]);
-}
-
-static NSData *dataReadUptoIncluding(NSData *data, NSUInteger *cursor, NSData *suffix) {
-  NSRange suffixRange = [data rangeOfData:suffix options:0 range:NSMakeRange(*cursor, [data length] - *cursor)];
-  if (suffixRange.location == NSNotFound) {
-    return nil;
-  }
-
-  NSUInteger newCursor = NSMaxRange(suffixRange);
-  NSData *subdata = [data subdataWithRange:NSMakeRange(*cursor, newCursor - *cursor)];
-  *cursor = newCursor;
-
-  return subdata;
-}
-
-static NSArray *dataReadHeaders(NSData *data, NSUInteger *cursor) {
-  NSData *headersData = dataReadUptoIncluding(data, cursor, [@"\n\n" dataUsingEncoding:NSUTF8StringEncoding]);
-  if (headersData == nil) {
-    headersData = dataReadUptoIncluding(data, cursor, [@"\r\n\r\n" dataUsingEncoding:NSUTF8StringEncoding]);
-  }
-  if (headersData == nil) {
-    return nil;
-  }
-
-  NSMutableArray *headers = [NSMutableArray array];
-
-  NSUInteger headersCursor = 0;
-  while (!dataReadNewline(headersData, &headersCursor)) {
-    if (headersCursor == [headersData length]) {
-      break;
-    }
-
-    NSData *currentHeader = dataReadUptoIncluding(headersData, &headersCursor, [@"\n" dataUsingEncoding:NSUTF8StringEncoding]);
-    if (currentHeader == nil) {
-      break;
-    }
-    [headers addObject:currentHeader];
-  }
-
-  return headers;
-}
-
-static NSCharacterSet *base64CharacterSet(void) {
-  static NSCharacterSet *characterSet = nil;
-  static dispatch_once_t characterSetPredicate = 0;
-  dispatch_once(&characterSetPredicate, ^{
-    NSMutableCharacterSet *newCharacterSet = [[NSMutableCharacterSet alloc] init];
-    [newCharacterSet addCharactersInString:@"abcdefghijklmnopqrstuvwxyz"];
-    [newCharacterSet addCharactersInString:@"ABCDEFGHIJKLMNOPQRSTUVWXYZ"];
-    [newCharacterSet addCharactersInString:@"0123456789"];
-    [newCharacterSet addCharactersInString:@"+/="];
-    characterSet = newCharacterSet;
-  });
-  return characterSet;
-}
-
-static NSData *dataReadCharactersFromSet(NSData *data, NSUInteger *cursor, NSCharacterSet *characterSet) {
-  NSRange subrange = NSMakeRange(NSNotFound, 0);
-
-  uint8_t const *bytes = [data bytes];
-  NSUInteger length = [data length];
-
-  while (*cursor < length) {
-    uint8_t character = *(bytes + *cursor);
-    if (![characterSet characterIsMember:character]) {
-      break;
-    }
-
-    if (subrange.location == NSNotFound) {
-      subrange.location = *cursor;
-      subrange.length = 1;
-    }
-    else {
-      subrange.length = subrange.length + 1;
-    }
-
-    *cursor = NSMaxRange(subrange);
-  }
-
-  if (subrange.location == NSNotFound) {
-    return nil;
-  }
-
-  return [data subdataWithRange:subrange];
-}
-
-static NSData *dataReadBase64Line(NSData *data, NSUInteger *cursor) {
-  NSUInteger originalCursor = *cursor;
-
-  NSData *characters = dataReadCharactersFromSet(data, cursor, base64CharacterSet());
-
-  if (!dataReadNewline(data, cursor)) {
-    *cursor = originalCursor;
-    return nil;
-  }
-
-  return characters;
-}
-
-static int _libssh2_decode_pem(NSData *pemData, NSData *header, NSData *footer, NSArray **headers, NSData **binary) {
-  NSUInteger cursor = 0;
-
-  if (!dataReadNext(pemData, &cursor, header)) {
-    return 1;
-  }
-  if (!dataReadNewline(pemData, &cursor)) {
-    return 1;
-  }
-
-  *headers = dataReadHeaders(pemData, &cursor);
-
-  NSMutableData *base64Data = [NSMutableData data];
-  NSData *base64Line = nil;
-  while ((base64Line = dataReadBase64Line(pemData, &cursor))) {
-    [base64Data appendData:base64Line];
-  }
-  if ([base64Data length] == 0) {
-    return 1;
-  }
-
-  *binary = [[NSData alloc] initWithBase64EncodedData:base64Data options:0];
-
-  if (!dataReadNext(pemData, &cursor, footer)) {
-    return 1;
-  }
-
-  return 0;
 }
 
 static int _libssh2_new_pem_encoded_rsa_pkcs1_key(CSSM_KEY **keyRef, NSData *keyData, NSString *passphrase) {
