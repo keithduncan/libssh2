@@ -529,12 +529,36 @@ int _libssh2_rsa_free(libssh2_rsa_ctx *rsactx) {
 extern OSStatus SecKeyCreateWithCSSMKey(const CSSM_KEY *key, SecKeyRef* keyRef);
 extern const char *cssmErrorString(CSSM_RETURN error);
 
-int _libssh2_rsa_sha1_verify(libssh2_rsa_ctx *rsa,
+int _libssh2_rsa_sha1_verify(libssh2_rsa_ctx *rsactx,
                              unsigned char const *sig,
                              unsigned long sig_len,
                              unsigned char const *m,
                              unsigned long m_len) {
-  return 1;
+  CSSM_CC_HANDLE context = CSSM_INVALID_HANDLE;
+  CSSM_RETURN error = CSSM_CSP_CreateSignatureContext(_libssh2_cdsa_csp, CSSM_ALGID_RSA, NULL, rsactx, &context);
+  if (error != CSSM_OK) {
+    return 1;
+  }
+
+  CSSM_DATA plaintext = {
+    .Length = m_len,
+    .Data = (uint8_t *)m,
+  };
+
+  CSSM_DATA signatureData = {
+    .Length = sig_len,
+    .Data = (uint8_t *)sig,
+  };
+
+  error = CSSM_VerifyData(context, &plaintext, 1, CSSM_ALGID_NONE, &signatureData);
+
+  CSSM_DeleteContext(context);
+
+  if (error != CSSM_OK) {
+    return 1;
+  }
+
+  return 0;
 }
 
 int _libssh2_rsa_sha1_sign(LIBSSH2_SESSION *session,
