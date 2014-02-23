@@ -598,15 +598,11 @@ static int _libssh2_rsa_new_public(libssh2_rsa_ctx **rsa,
 }
 
 /*
-    See the extensive documentation for `_libssh2_new_pem_encoded_key`.
+    See the extensive documentation for `_libssh2_new_pem_key`.
 
     Handles DER encoded PKCS#8 keys, there is no outer PEM encoding to unwrap.
  */
-static int _libssh2_new_der_encoded_key(libssh2_rsa_ctx **rsa, NSData *keyData, NSString *passphrase) {
-  if (passphrase != nil) {
-    return 1;
-  }
-
+static int _libssh2_new_der_private_key(libssh2_rsa_ctx **rsa, NSData *keyData) {
   SecAsn1CoderRef coder;
   OSStatus error = SecAsn1CoderCreate(&coder);
   if (error != errSecSuccess) {
@@ -659,6 +655,36 @@ static int _libssh2_new_der_encoded_key(libssh2_rsa_ctx **rsa, NSData *keyData, 
 
   *rsa = newKey;
   return 0;
+}
+
+static int _libssh2_new_der_encrypted_private_key(libssh2_rsa_ctx **rsa, NSData *keyData, NSString *passphrase) {
+  SecAsn1CoderRef coder;
+  OSStatus error = SecAsn1CoderCreate(&coder);
+  if (error != errSecSuccess) {
+    return 1;
+  }
+
+  _libssh2_pkcs8_private_key privateKeyData = {};
+  error = SecAsn1Decode(coder, [keyData bytes], [keyData length], _libssh2_pkcs8_encrypted_private_key_template, &privateKeyData);
+  if (error != errSecSuccess) {
+    SecAsn1CoderRelease(coder);
+    return 1;
+  }
+
+  SecAsn1CoderRelease(coder);
+  return 1;
+}
+
+static int _libssh2_new_der_key(libssh2_rsa_ctx **rsa, NSData *keyData, NSString *passphrase) {
+  if (_libssh2_new_der_private_key(rsa, keyData) == 0) {
+    return 0;
+  }
+
+  if (_libssh2_new_der_encrypted_private_key(rsa, keyData, passphrase) == 0) {
+    return 0;
+  }
+
+  return 1;
 }
 
 static int _libssh2_new_pem_pkcs1_rsa_key(CSSM_KEY **keyRef, NSData *keyData, NSString *passphrase) {
@@ -730,7 +756,7 @@ static int _libssh2_new_pem_pkcs8_key(CSSM_KEY **keyRef, NSData *keyData, NSStri
     return 1;
   }
 
-  return _libssh2_new_der_encoded_key(keyRef, binary, passphrase);
+  return _libssh2_new_der_key(keyRef, binary, passphrase);
 }
 
 /*
@@ -787,7 +813,7 @@ static int _libssh2_new_pem_pkcs8_key(CSSM_KEY **keyRef, NSData *keyData, NSStri
 
     Returns 0 if the key was populated, 1 otherwise.
  */
-static int _libssh2_new_pem_encoded_key(CSSM_KEY **keyRef, NSData *keyData, NSString *passphrase) {
+static int _libssh2_new_pem_key(CSSM_KEY **keyRef, NSData *keyData, NSString *passphrase) {
   if (_libssh2_new_pem_pkcs1_rsa_key(keyRef, keyData, passphrase) == 0) {
     return 0;
   }
@@ -844,10 +870,10 @@ int _libssh2_rsa_new_private(libssh2_rsa_ctx **rsa, LIBSSH2_SESSION *session, ch
     int keyError = 0;
 
     if ([nsFilename.pathExtension caseInsensitiveCompare:@"pem"] == NSOrderedSame) {
-      keyError = _libssh2_new_pem_encoded_key(&key, keyData, nsPassphrase);
+      keyError = _libssh2_new_pem_key(&key, keyData, nsPassphrase);
     }
     else if ([nsFilename.pathExtension caseInsensitiveCompare:@"der"] == NSOrderedSame) {
-      keyError = _libssh2_new_der_encoded_key(&key, keyData, nsPassphrase);
+      keyError = _libssh2_new_der_key(&key, keyData, nsPassphrase);
     }
 
     if (keyError != 0) {
