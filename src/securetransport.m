@@ -8,6 +8,8 @@
 
 #include "libssh2_priv.h"
 
+#pragma mark - CSSM
+
 static const CSSM_GUID _libssh2_cdsa_guid = { 0xA606, 0x71CF, 0x8F03, { 0x48, 0xE0, 0xAF, 0xE8, 0x8D, 0x20, 0x86, 0x16 } }; // generated using `uuidgen`
 static CSSM_CSP_HANDLE _libssh2_cdsa_csp = CSSM_INVALID_HANDLE;
 
@@ -68,6 +70,40 @@ void libssh2_crypto_init(void) {
 
 void libssh2_crypto_exit(void) {
   detachFromModules();
+}
+
+static CSSM_KEY *_libssh2_copy_key(CSSM_KEY *key) {
+  CSSM_KEY *newKey = malloc(sizeof(CSSM_KEY));
+
+  memmove(&((newKey)->KeyHeader), &(*key).KeyHeader, sizeof((*key).KeyHeader));
+
+  newKey->KeyData.Length = key->KeyData.Length;
+  newKey->KeyData.Data = malloc(key->KeyData.Length);
+  memmove(newKey->KeyData.Data, key->KeyData.Data, key->KeyData.Length);
+
+  return newKey;
+}
+
+static int _libssh2_key_query_size(CSSM_KEY *key) {
+  CSSM_KEY_SIZE keySize;
+  CSSM_RETURN error = CSSM_QueryKeySizeInBits(_libssh2_cdsa_csp, CSSM_INVALID_HANDLE, key, &keySize);
+  if (error != CSSM_OK) {
+    return 1;
+  }
+  key->KeyHeader.LogicalKeySizeInBits = keySize.LogicalKeySizeInBits;
+  return 0;
+}
+
+static int _libssh2_key_free(CSSM_KEY *key) {
+  // Why isn't this using CSSM_FreeKey?
+
+  bzero(key->KeyData.Data, key->KeyData.Length);
+  free(key->KeyData.Data);
+
+  bzero(key, sizeof(CSSM_KEY)); // should probably _actually_ zero the data
+  free(key);
+
+  return 0;
 }
 
 #pragma mark - PEM
@@ -254,21 +290,15 @@ static int _libssh2_rsa_new_from_pkcs1_raw_blob(CSSM_KEY **keyRef, CSSM_KEYCLASS
     },
   };
 
-  CSSM_KEY_SIZE keySize = {};
-  CSSM_RETURN error = CSSM_QueryKeySizeInBits(_libssh2_cdsa_csp, CSSM_INVALID_HANDLE, &key, &keySize);
-  if (error != CSSM_OK) {
+  CSSM_KEY *newKey = _libssh2_copy_key(&key);
+
+  int keyError = _libssh2_key_query_size(newKey);
+  if (keyError != 0) {
+    _libssh2_key_free(newKey);
     return 1;
   }
-  key.KeyHeader.LogicalKeySizeInBits = keySize.LogicalKeySizeInBits;
 
-  *keyRef = malloc(sizeof(key));
-
-  memmove(&((*keyRef)->KeyHeader), &key.KeyHeader, sizeof(key.KeyHeader));
-
-  (*keyRef)->KeyData.Length = key.KeyData.Length;
-  (*keyRef)->KeyData.Data = malloc(key.KeyData.Length);
-  memmove((*keyRef)->KeyData.Data, key.KeyData.Data, key.KeyData.Length);
-
+  *keyRef = newKey;
   return 0;
 }
 
@@ -546,7 +576,32 @@ static int _libssh2_new_pem_encoded_key(CSSM_KEY **keyRef, NSData *keyData, NSSt
     Handles DER encoded PKCS#8 keys, there is no outer PEM encoding to unwrap.
  */
 static int _libssh2_new_der_encoded_key(libssh2_rsa_ctx **rsa, NSData *keyData, NSString *passphrase) {
-  return 1;
+  if (passphrase != nil) {
+    return 1;
+  }
+
+  CSSM_KEY key = {
+    .KeyHeader = {
+      .HeaderVersion = CSSM_KEYHEADER_VERSION,
+      .BlobType = CSSM_KEYBLOB_RAW,
+      .Format = CSSM_KEYBLOB_RAW_FORMAT_PKCS8,
+      .AlgorithmId = CSSM_ALGID_RSA,
+      .KeyClass = CSSM_KEYCLASS_PRIVATE_KEY,
+      .KeyUsage = CSSM_KEYUSE_ANY,
+    },
+    .KeyData = {
+      .Length = [keyData length],
+      .Data = (uint8_t *)[keyData bytes],
+    },
+  };
+
+  int keyError = _libssh2_key_query_size(&key);
+  if (keyError != 0) {
+    return keyError;
+  }
+
+  *rsa = _libssh2_copy_key(&key);
+  return 0;
 }
 
 /*
@@ -611,15 +666,7 @@ int _libssh2_rsa_new_private(libssh2_rsa_ctx **rsa, LIBSSH2_SESSION *session, ch
 }
 
 int _libssh2_rsa_free(libssh2_rsa_ctx *rsactx) {
-  // Why isn't this using CSSM_FreeKey?
-
-  bzero(rsactx->KeyData.Data, rsactx->KeyData.Length);
-  free(rsactx->KeyData.Data);
-
-  bzero(rsactx, sizeof(CSSM_KEY)); // should probably _actually_ zero the data
-  free(rsactx);
-
-  return 0;
+  return _libssh2_key_free(rsactx);
 }
 
 extern OSStatus SecKeyCreateWithCSSMKey(const CSSM_KEY *key, SecKeyRef* keyRef);
