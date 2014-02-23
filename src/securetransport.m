@@ -28,9 +28,9 @@ static void *_libssh2_cdsa_calloc(uint32_t number, CSSM_SIZE size, void *allocre
 }
 
 static const CSSM_API_MEMORY_FUNCS _libssh2_cdsa_memory_functions = {
-	_libssh2_cdsa_malloc,
-	_libssh2_cdsa_free,
-	_libssh2_cdsa_realloc,
+  _libssh2_cdsa_malloc,
+  _libssh2_cdsa_free,
+  _libssh2_cdsa_realloc,
   _libssh2_cdsa_calloc,
   NULL,
 };
