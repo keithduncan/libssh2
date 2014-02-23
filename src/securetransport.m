@@ -313,36 +313,36 @@ typedef struct {
   CSSM_DATA exponent1;
   CSSM_DATA exponent2;
   CSSM_DATA coefficient;
-} _libssh2_RSA_PKCS1_private_key;
+} _libssh2_PKCS1_RSA_private_key;
 
 typedef enum {
   RSA_Version_TwoPrime = 0,
   RSA_Version_Multi = 1,
 } RSA_Version;
 
-static SecAsn1Template const _libssh2_RSA_PKCS1_private_key_template[] = {
-  { .kind = SEC_ASN1_SEQUENCE, .size = sizeof(_libssh2_RSA_PKCS1_private_key) },
-  { .kind = SEC_ASN1_INTEGER, .offset = offsetof(_libssh2_RSA_PKCS1_private_key, version) },
-  { .kind = SEC_ASN1_INTEGER, .offset = offsetof(_libssh2_RSA_PKCS1_private_key, modulus) },
-  { .kind = SEC_ASN1_INTEGER, .offset = offsetof(_libssh2_RSA_PKCS1_private_key, publicExponent) },
-  { .kind = SEC_ASN1_INTEGER, .offset = offsetof(_libssh2_RSA_PKCS1_private_key, privateExponent) },
-  { .kind = SEC_ASN1_INTEGER, .offset = offsetof(_libssh2_RSA_PKCS1_private_key, prime1) },
-  { .kind = SEC_ASN1_INTEGER, .offset = offsetof(_libssh2_RSA_PKCS1_private_key, prime2) },
-  { .kind = SEC_ASN1_INTEGER, .offset = offsetof(_libssh2_RSA_PKCS1_private_key, exponent1) },
-  { .kind = SEC_ASN1_INTEGER, .offset = offsetof(_libssh2_RSA_PKCS1_private_key, exponent2) },
-  { .kind = SEC_ASN1_INTEGER, .offset = offsetof(_libssh2_RSA_PKCS1_private_key, coefficient) },
+static SecAsn1Template const _libssh2_PKCS1_RSA_private_key_template[] = {
+  { .kind = SEC_ASN1_SEQUENCE, .size = sizeof(_libssh2_PKCS1_RSA_private_key) },
+  { .kind = SEC_ASN1_INTEGER, .offset = offsetof(_libssh2_PKCS1_RSA_private_key, version) },
+  { .kind = SEC_ASN1_INTEGER, .offset = offsetof(_libssh2_PKCS1_RSA_private_key, modulus) },
+  { .kind = SEC_ASN1_INTEGER, .offset = offsetof(_libssh2_PKCS1_RSA_private_key, publicExponent) },
+  { .kind = SEC_ASN1_INTEGER, .offset = offsetof(_libssh2_PKCS1_RSA_private_key, privateExponent) },
+  { .kind = SEC_ASN1_INTEGER, .offset = offsetof(_libssh2_PKCS1_RSA_private_key, prime1) },
+  { .kind = SEC_ASN1_INTEGER, .offset = offsetof(_libssh2_PKCS1_RSA_private_key, prime2) },
+  { .kind = SEC_ASN1_INTEGER, .offset = offsetof(_libssh2_PKCS1_RSA_private_key, exponent1) },
+  { .kind = SEC_ASN1_INTEGER, .offset = offsetof(_libssh2_PKCS1_RSA_private_key, exponent2) },
+  { .kind = SEC_ASN1_INTEGER, .offset = offsetof(_libssh2_PKCS1_RSA_private_key, coefficient) },
   { },
 };
 
 typedef struct {
   CSSM_DATA modulus;
   CSSM_DATA publicExponent;
-} _libssh2_RSA_PKCS1_public_key;
+} _libssh2_PKCS1_RSA_public_key;
 
-static SecAsn1Template const _libssh2_RSA_PKCS1_public_key_template[] = {
-  { .kind = SEC_ASN1_SEQUENCE, .size = sizeof(_libssh2_RSA_PKCS1_public_key) },
-  { .kind = SEC_ASN1_INTEGER, .offset = offsetof(_libssh2_RSA_PKCS1_public_key, modulus) },
-  { .kind = SEC_ASN1_INTEGER, .offset = offsetof(_libssh2_RSA_PKCS1_public_key, publicExponent) },
+static SecAsn1Template const _libssh2_PKCS1_RSA_public_key_template[] = {
+  { .kind = SEC_ASN1_SEQUENCE, .size = sizeof(_libssh2_PKCS1_RSA_public_key) },
+  { .kind = SEC_ASN1_INTEGER, .offset = offsetof(_libssh2_PKCS1_RSA_public_key, modulus) },
+  { .kind = SEC_ASN1_INTEGER, .offset = offsetof(_libssh2_PKCS1_RSA_public_key, publicExponent) },
   { },
 };
 
@@ -401,7 +401,7 @@ int _libssh2_rsa_new(libssh2_rsa_ctx **rsa,
 
    uint8_t version = RSA_Version_TwoPrime;
 
-  _libssh2_RSA_PKCS1_private_key keyData = {
+  _libssh2_PKCS1_RSA_private_key keyData = {
     .version = {
       .Length = sizeof(version),
       .Data = &version,
@@ -440,7 +440,7 @@ int _libssh2_rsa_new(libssh2_rsa_ctx **rsa,
     },
   };
 
-  return _libssh2_rsa_new_from_binary_template(rsa, CSSM_KEYCLASS_PRIVATE_KEY, &keyData, _libssh2_RSA_PKCS1_private_key_template);
+  return _libssh2_rsa_new_from_binary_template(rsa, CSSM_KEYCLASS_PRIVATE_KEY, &keyData, _libssh2_PKCS1_RSA_private_key_template);
 }
 
 /*
@@ -451,7 +451,7 @@ static int _libssh2_rsa_new_public(libssh2_rsa_ctx **rsa,
                                    unsigned long elen,
                                    unsigned char const *ndata,
                                    unsigned long nlen) {
-  _libssh2_RSA_PKCS1_public_key keyData = {
+  _libssh2_PKCS1_RSA_public_key keyData = {
     .modulus = {
       .Length = nlen,
       .Data = (uint8_t *)ndata,
@@ -461,10 +461,10 @@ static int _libssh2_rsa_new_public(libssh2_rsa_ctx **rsa,
       .Data = (uint8_t *)edata,
     },
   };
-  return _libssh2_rsa_new_from_binary_template(rsa, CSSM_KEYCLASS_PUBLIC_KEY, &keyData, _libssh2_RSA_PKCS1_public_key_template);
+  return _libssh2_rsa_new_from_binary_template(rsa, CSSM_KEYCLASS_PUBLIC_KEY, &keyData, _libssh2_PKCS1_RSA_public_key_template);
 }
 
-static int _libssh2_new_pem_encoded_rsa_pkcs1_key(CSSM_KEY **keyRef, NSData *keyData, NSString *passphrase) {
+static int _libssh2_new_pem_encoded_PKCS1_RSA_key(CSSM_KEY **keyRef, NSData *keyData, NSString *passphrase) {
   CSSM_KEYCLASS keyClass = CSSM_KEYCLASS_OTHER;
   if (dataHasPrefix(keyData, data(_libssh2_pkcs1_rsa_private_key_header))) {
     keyClass = CSSM_KEYCLASS_PRIVATE_KEY;
@@ -559,7 +559,7 @@ static int _libssh2_new_pem_encoded_pkcs8_key(CSSM_KEY **keyRef, NSData *keyData
     Returns 0 if the key was populated, 1 otherwise.
  */
 static int _libssh2_new_pem_encoded_key(CSSM_KEY **keyRef, NSData *keyData, NSString *passphrase) {
-  if (_libssh2_new_pem_encoded_rsa_pkcs1_key(keyRef, keyData, passphrase) == 0) {
+  if (_libssh2_new_pem_encoded_PKCS1_RSA_key(keyRef, keyData, passphrase) == 0) {
     return 0;
   }
 
@@ -683,18 +683,18 @@ static int _libssh2_rsa_convert_private_key_to_public_key(CSSM_KEY *privateKey, 
     return 1;
   }
 
-  _libssh2_RSA_PKCS1_private_key privateKeyData;
-  error = SecAsn1Decode(coder, privateKey->KeyData.Data, privateKey->KeyData.Length, _libssh2_RSA_PKCS1_private_key_template, &privateKeyData);
+  _libssh2_PKCS1_RSA_private_key privateKeyData;
+  error = SecAsn1Decode(coder, privateKey->KeyData.Data, privateKey->KeyData.Length, _libssh2_PKCS1_RSA_private_key_template, &privateKeyData);
   if (error != errSecSuccess) {
     return 1;
   }
 
-  _libssh2_RSA_PKCS1_public_key publicKeyData = {
+  _libssh2_PKCS1_RSA_public_key publicKeyData = {
     .modulus = privateKeyData.modulus,
     .publicExponent = privateKeyData.publicExponent,
   };
 
-  return _libssh2_rsa_new_from_binary_template(publicKeyRef, CSSM_KEYCLASS_PUBLIC_KEY, &publicKeyData, _libssh2_RSA_PKCS1_public_key_template);
+  return _libssh2_rsa_new_from_binary_template(publicKeyRef, CSSM_KEYCLASS_PUBLIC_KEY, &publicKeyData, _libssh2_PKCS1_RSA_public_key_template);
 }
 
 int _libssh2_rsa_sha1_verify(libssh2_rsa_ctx *rsactx,
