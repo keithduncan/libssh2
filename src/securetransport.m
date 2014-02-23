@@ -577,7 +577,8 @@ static int _libssh2_new_der_encoded_key(libssh2_rsa_ctx **rsa, NSData *keyData, 
 */
 int _libssh2_rsa_new_private(libssh2_rsa_ctx **rsa, LIBSSH2_SESSION *session, char const *filename, unsigned char const *passphrase) {
   @autoreleasepool {
-    NSData *keyData = [NSData dataWithContentsOfFile:@(filename) options:0 error:NULL];
+    NSString *nsFilename = @(filename);
+    NSData *keyData = [NSData dataWithContentsOfFile:nsFilename options:0 error:NULL];
     if (keyData == NULL) {
       return 1;
     }
@@ -587,7 +588,15 @@ int _libssh2_rsa_new_private(libssh2_rsa_ctx **rsa, LIBSSH2_SESSION *session, ch
     NSString *nsPassphrase = passphrase ? [NSString stringWithCString:(char const *)passphrase encoding:NSUTF8StringEncoding] : NULL;
 
     CSSM_KEY *key = NULL;
-    int keyError = _libssh2_new_pem_encoded_key(&key, keyData, nsPassphrase);
+    int keyError = 0;
+
+    if ([nsFilename.pathExtension caseInsensitiveCompare:@"pem"] == NSOrderedSame) {
+      keyError = _libssh2_new_pem_encoded_key(&key, keyData, nsPassphrase);
+    }
+    else if ([nsFilename.pathExtension caseInsensitiveCompare:@"der"] == NSOrderedSame) {
+      keyError = _libssh2_new_der_encoded_key(&key, keyData, nsPassphrase);
+    }
+
     if (keyError != 0) {
       return keyError;
     }
