@@ -844,7 +844,7 @@ int _libssh2_rsa_sha1_verify(libssh2_rsa_ctx *rsactx,
   CSSM_CC_HANDLE context = CSSM_INVALID_HANDLE;
   CSSM_RETURN error = CSSM_CSP_CreateSignatureContext(_libssh2_cdsa_csp, CSSM_ALGID_RSA, NULL, publicKey, &context);
   if (error != CSSM_OK) {
-    _libssh2_rsa_free(publicKey);
+    _libssh2_key_free(publicKey);
     return 1;
   }
 
@@ -861,7 +861,7 @@ int _libssh2_rsa_sha1_verify(libssh2_rsa_ctx *rsactx,
   error = CSSM_VerifyData(context, &plaintext, 1, CSSM_ALGID_NONE, &signatureData);
 
   CSSM_DeleteContext(context);
-  _libssh2_rsa_free(publicKey);
+  _libssh2_key_free(publicKey);
 
   if (error != CSSM_OK) {
     return 1;
