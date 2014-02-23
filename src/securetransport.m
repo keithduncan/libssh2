@@ -414,7 +414,7 @@ int _libssh2_rsa_new(libssh2_rsa_ctx **rsa,
 }
 
 /*
-    Create an RSA private key from the raw numeric components.
+    Create an RSA public key from the raw numeric components.
  */
 static int _libssh2_rsa_new_public(libssh2_rsa_ctx **rsa,
                                    unsigned char const *edata,
