@@ -581,6 +581,70 @@ static int _libssh2_rsa_new_public(libssh2_rsa_ctx **rsa,
   return _libssh2_rsa_new_from_binary_template(rsa, CSSM_KEYBLOB_RAW_FORMAT_PKCS1, CSSM_KEYCLASS_PUBLIC_KEY, &keyData, _libssh2_pkcs1_rsa_public_key_template);
 }
 
+/*
+    See the extensive documentation for `_libssh2_new_pem_encoded_key`.
+
+    Handles DER encoded PKCS#8 keys, there is no outer PEM encoding to unwrap.
+ */
+static int _libssh2_new_der_encoded_key(libssh2_rsa_ctx **rsa, NSData *keyData, NSString *passphrase) {
+  if (passphrase != nil) {
+    return 1;
+  }
+
+  SecAsn1CoderRef coder;
+  OSStatus error = SecAsn1CoderCreate(&coder);
+  if (error != errSecSuccess) {
+    return 1;
+  }
+
+  _libssh2_pkcs8_private_key privateKeyData = {};
+  error = SecAsn1Decode(coder, [keyData bytes], [keyData length], _libssh2_pkcs8_private_key_template, &privateKeyData);
+  if (error != errSecSuccess) {
+    SecAsn1CoderRelease(coder);
+    return 1;
+  }
+
+  NSData *rsaOid = _libssh2_oid_rsa();
+  if (rsaOid == nil) {
+    SecAsn1CoderRelease(coder);
+    return 1;
+  }
+
+  CSSM_OID privateKeyAlgorithm = privateKeyData.privateKeyAlgorithm.algorithm;
+  if (![[NSData dataWithBytes:privateKeyAlgorithm.Data length:privateKeyAlgorithm.Length] isEqualToData:rsaOid]) {
+    SecAsn1CoderRelease(coder);
+    return 1;
+  }
+
+  SecAsn1CoderRelease(coder);
+
+  CSSM_KEY key = {
+    .KeyHeader = {
+      .HeaderVersion = CSSM_KEYHEADER_VERSION,
+      .BlobType = CSSM_KEYBLOB_RAW,
+      .Format = CSSM_KEYBLOB_RAW_FORMAT_PKCS8,
+      .AlgorithmId = CSSM_ALGID_RSA,
+      .KeyClass = CSSM_KEYCLASS_PRIVATE_KEY,
+      .KeyUsage = CSSM_KEYUSE_ANY,
+    },
+    .KeyData = {
+      .Length = [keyData length],
+      .Data = (uint8_t *)[keyData bytes],
+    },
+  };
+
+  CSSM_KEY *newKey = _libssh2_copy_key(&key);
+
+  int keyError = _libssh2_key_query_size(newKey);
+  if (keyError != 0) {
+    _libssh2_key_free(newKey);
+    return keyError;
+  }
+
+  *rsa = newKey;
+  return 0;
+}
+
 static int _libssh2_new_pem_pkcs1_rsa_key(CSSM_KEY **keyRef, NSData *keyData, NSString *passphrase) {
   CSSM_KEYCLASS keyClass = CSSM_KEYCLASS_OTHER;
   if (dataHasPrefix(keyData, data(_libssh2_pkcs1_rsa_private_key_header))) {
@@ -618,7 +682,39 @@ static int _libssh2_new_pem_pkcs1_rsa_key(CSSM_KEY **keyRef, NSData *keyData, NS
 }
 
 static int _libssh2_new_pem_pkcs8_key(CSSM_KEY **keyRef, NSData *keyData, NSString *passphrase) {
-  return 1;
+  CSSM_KEYCLASS keyClass = CSSM_KEYCLASS_OTHER;
+  if (dataHasPrefix(keyData, data(_libssh2_pkcs8_private_key_header))) {
+    keyClass = CSSM_KEYCLASS_PRIVATE_KEY;
+  }
+  else if (dataHasPrefix(keyData, data(_libssh2_pkcs8_public_key_header))) {
+    keyClass = CSSM_KEYCLASS_PUBLIC_KEY;
+  }
+  if (keyClass == CSSM_KEYCLASS_OTHER) {
+    return 1;
+  }
+
+  NSData *header, *footer;
+  if (keyClass == CSSM_KEYCLASS_PRIVATE_KEY) {
+    header = data(_libssh2_pkcs8_private_key_header);
+    footer = data(_libssh2_pkcs8_private_key_footer);
+  }
+  else if (keyClass == CSSM_KEYCLASS_PUBLIC_KEY) {
+    header = data(_libssh2_pkcs8_public_key_header);
+    footer = data(_libssh2_pkcs8_public_key_footer);
+  }
+
+  NSArray *headers = nil;
+  NSData *binary = nil;
+  int decode = _libssh2_decode_pem(keyData, header, footer, &headers, &binary);
+  if (decode != 0) {
+    return decode;
+  }
+
+  if ([headers count] != 0) {
+    return 1;
+  }
+
+  return _libssh2_new_der_encoded_key(keyRef, binary, passphrase);
 }
 
 /*
@@ -685,70 +781,6 @@ static int _libssh2_new_pem_encoded_key(CSSM_KEY **keyRef, NSData *keyData, NSSt
   }
 
   return 1;
-}
-
-/*
-    See the extensive documentation for `_libssh2_new_pem_encoded_key`.
-
-    Handles DER encoded PKCS#8 keys, there is no outer PEM encoding to unwrap.
- */
-static int _libssh2_new_der_encoded_key(libssh2_rsa_ctx **rsa, NSData *keyData, NSString *passphrase) {
-  if (passphrase != nil) {
-    return 1;
-  }
-
-  SecAsn1CoderRef coder;
-  OSStatus error = SecAsn1CoderCreate(&coder);
-  if (error != errSecSuccess) {
-    return 1;
-  }
-
-  _libssh2_pkcs8_private_key privateKeyData = {};
-  error = SecAsn1Decode(coder, [keyData bytes], [keyData length], _libssh2_pkcs8_private_key_template, &privateKeyData);
-  if (error != errSecSuccess) {
-    SecAsn1CoderRelease(coder);
-    return 1;
-  }
-
-  NSData *rsaOid = _libssh2_oid_rsa();
-  if (rsaOid == nil) {
-    SecAsn1CoderRelease(coder);
-    return 1;
-  }
-
-  CSSM_OID privateKeyAlgorithm = privateKeyData.privateKeyAlgorithm.algorithm;
-  if (![[NSData dataWithBytes:privateKeyAlgorithm.Data length:privateKeyAlgorithm.Length] isEqualToData:rsaOid]) {
-    SecAsn1CoderRelease(coder);
-    return 1;
-  }
-
-  SecAsn1CoderRelease(coder);
-
-  CSSM_KEY key = {
-    .KeyHeader = {
-      .HeaderVersion = CSSM_KEYHEADER_VERSION,
-      .BlobType = CSSM_KEYBLOB_RAW,
-      .Format = CSSM_KEYBLOB_RAW_FORMAT_PKCS8,
-      .AlgorithmId = CSSM_ALGID_RSA,
-      .KeyClass = CSSM_KEYCLASS_PRIVATE_KEY,
-      .KeyUsage = CSSM_KEYUSE_ANY,
-    },
-    .KeyData = {
-      .Length = [keyData length],
-      .Data = (uint8_t *)[keyData bytes],
-    },
-  };
-
-  CSSM_KEY *newKey = _libssh2_copy_key(&key);
-
-  int keyError = _libssh2_key_query_size(newKey);
-  if (keyError != 0) {
-    _libssh2_key_free(newKey);
-    return keyError;
-  }
-
-  *rsa = newKey;
-  return 0;
 }
 
 /*
