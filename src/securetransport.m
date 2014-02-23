@@ -674,6 +674,37 @@ static int _libssh2_new_der_encoded_key(libssh2_rsa_ctx **rsa, NSData *keyData, 
     return 1;
   }
 
+  SecAsn1CoderRef coder;
+  OSStatus error = SecAsn1CoderCreate(&coder);
+  if (error != errSecSuccess) {
+    return 1;
+  }
+
+  _libssh2_pkcs8_private_key privateKeyData = {};
+  error = SecAsn1Decode(coder, [keyData bytes], [keyData length], _libssh2_pkcs8_private_key_template, &privateKeyData);
+  if (error != errSecSuccess) {
+    SecAsn1CoderRelease(coder);
+    return 1;
+  }
+
+  // {iso(1) member-body(2) us(840) rsadsi(113549) pkcs(1) pkcs-1(1) rsaEncryption(1)}
+  // <http://www.oid-info.com/cgi-bin/display?tree=1.2.840.113549.1(1>
+  uint32_t rsaOidComponents[] = { 1, 2, 840, 113549, 1, 1, 1 };
+
+  NSData *rsaOid = _libssh2_encode_oid(rsaOidComponents, sizeof(rsaOidComponents)/sizeof(*rsaOidComponents));
+  if (rsaOid == nil) {
+    SecAsn1CoderRelease(coder);
+    return 1;
+  }
+
+  CSSM_OID privateKeyAlgorithm = privateKeyData.privateKeyAlgorithm.algorithm;
+  if (![[NSData dataWithBytes:privateKeyAlgorithm.Data length:privateKeyAlgorithm.Length] isEqualToData:rsaOid]) {
+    SecAsn1CoderRelease(coder);
+    return 1;
+  }
+
+  SecAsn1CoderRelease(coder);
+
   CSSM_KEY key = {
     .KeyHeader = {
       .HeaderVersion = CSSM_KEYHEADER_VERSION,
