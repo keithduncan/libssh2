@@ -720,12 +720,15 @@ static int _libssh2_new_der_encoded_key(libssh2_rsa_ctx **rsa, NSData *keyData, 
     },
   };
 
-  int keyError = _libssh2_key_query_size(&key);
+  CSSM_KEY *newKey = _libssh2_copy_key(&key);
+
+  int keyError = _libssh2_key_query_size(newKey);
   if (keyError != 0) {
+    _libssh2_key_free(newKey);
     return keyError;
   }
 
-  *rsa = _libssh2_copy_key(&key);
+  *rsa = newKey;
   return 0;
 }
 
