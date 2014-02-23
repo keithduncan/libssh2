@@ -703,6 +703,7 @@ static int _libssh2_rsa_convert_private_key_to_public_key(CSSM_KEY *privateKey, 
   _libssh2_pkcs1_rsa_private_key privateKeyData;
   error = SecAsn1Decode(coder, privateKey->KeyData.Data, privateKey->KeyData.Length, _libssh2_pkcs1_rsa_private_key_template, &privateKeyData);
   if (error != errSecSuccess) {
+    SecAsn1CoderRelease(coder);
     return 1;
   }
 
@@ -711,7 +712,11 @@ static int _libssh2_rsa_convert_private_key_to_public_key(CSSM_KEY *privateKey, 
     .publicExponent = privateKeyData.publicExponent,
   };
 
-  return _libssh2_rsa_new_from_binary_template(publicKeyRef, CSSM_KEYCLASS_PUBLIC_KEY, &publicKeyData, _libssh2_pkcs1_rsa_public_key_template);
+  int publicKeyError = _libssh2_rsa_new_from_binary_template(publicKeyRef, CSSM_KEYBLOB_RAW_FORMAT_PKCS1, CSSM_KEYCLASS_PUBLIC_KEY, &publicKeyData, _libssh2_pkcs1_rsa_public_key_template);
+
+  SecAsn1CoderRelease(coder);
+
+  return publicKeyError;
 }
 
 int _libssh2_rsa_sha1_verify(libssh2_rsa_ctx *rsactx,
