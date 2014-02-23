@@ -9,7 +9,7 @@
 
 #include "libssh2_priv.h"
 
-#pragma mark - CSSM
+#pragma mark CSSM
 
 static const CSSM_GUID _libssh2_cdsa_guid = { 0xA606, 0x71CF, 0x8F03, { 0x48, 0xE0, 0xAF, 0xE8, 0x8D, 0x20, 0x86, 0x16 } }; // generated using `uuidgen`
 static CSSM_CSP_HANDLE _libssh2_cdsa_csp = CSSM_INVALID_HANDLE;
