@@ -703,7 +703,7 @@ static int _libssh2_rsa_convert_private_key_to_public_key(CSSM_KEY *privateKey, 
     return 1;
   }
 
-  _libssh2_pkcs1_rsa_private_key privateKeyData;
+  _libssh2_pkcs1_rsa_private_key privateKeyData = {};
   error = SecAsn1Decode(coder, privateKey->KeyData.Data, privateKey->KeyData.Length, _libssh2_pkcs1_rsa_private_key_template, &privateKeyData);
   if (error != errSecSuccess) {
     SecAsn1CoderRelease(coder);
