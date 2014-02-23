@@ -502,6 +502,17 @@ int _libssh2_rsa_new(libssh2_rsa_ctx **rsa,
                      unsigned long e2len,
                      unsigned char const *coeffdata,
                      unsigned long coefflen) {
+  NSCParameterAssert(rsa != NULL);
+  NSCParameterAssert(edata != NULL);
+  NSCParameterAssert(ndata != NULL);
+  NSCParameterAssert(ddata != NULL);
+  NSCParameterAssert(pdata != NULL);
+  NSCParameterAssert(qdata != NULL);
+  NSCParameterAssert(e1data != NULL);
+  NSCParameterAssert(e2data != NULL);
+  NSCParameterAssert(e2data != NULL);
+  NSCParameterAssert(coeffdata != NULL);
+
    uint8_t version = RSA_Version_TwoPrime;
 
   _libssh2_pkcs1_rsa_private_key keyData = {
@@ -553,6 +564,10 @@ static int _libssh2_rsa_new_public(libssh2_rsa_ctx **rsa,
                                    unsigned long elen,
                                    unsigned char const *ndata,
                                    unsigned long nlen) {
+  NSCParameterAssert(rsa != NULL);
+  NSCParameterAssert(edata != NULL);
+  NSCParameterAssert(ndata != NULL);
+
   _libssh2_pkcs1_rsa_public_key keyData = {
     .modulus = {
       .Length = nlen,
@@ -763,6 +778,9 @@ static int _libssh2_new_der_encoded_key(libssh2_rsa_ctx **rsa, NSData *keyData, 
     Returns 0 if the key is created, 1 otherwise.
 */
 int _libssh2_rsa_new_private(libssh2_rsa_ctx **rsa, LIBSSH2_SESSION *session, char const *filename, unsigned char const *passphrase) {
+  NSCParameterAssert(rsa != NULL);
+  NSCParameterAssert(filename != NULL);
+
   @autoreleasepool {
     NSString *nsFilename = @(filename);
     NSData *keyData = [NSData dataWithContentsOfFile:nsFilename options:0 error:NULL];
@@ -798,6 +816,8 @@ int _libssh2_rsa_new_private(libssh2_rsa_ctx **rsa, LIBSSH2_SESSION *session, ch
 }
 
 int _libssh2_rsa_free(libssh2_rsa_ctx *rsactx) {
+  NSCParameterAssert(rsactx != NULL);
+
   return _libssh2_key_free(rsactx);
 }
 
@@ -879,6 +899,10 @@ int _libssh2_rsa_sha1_verify(libssh2_rsa_ctx *rsactx,
                              unsigned long sig_len,
                              unsigned char const *m,
                              unsigned long m_len) {
+  NSCParameterAssert(rsactx != NULL);
+  NSCParameterAssert(sig != NULL);
+  NSCParameterAssert(m != NULL);
+
   CSSM_KEY *publicKey = NULL;
   int publicKeyError = _libssh2_rsa_convert_private_key_to_public_key(rsactx, &publicKey);
   if (publicKeyError != 0) {
@@ -920,6 +944,11 @@ int _libssh2_rsa_sha1_sign(LIBSSH2_SESSION *session,
                            size_t hash_len,
                            unsigned char **signature,
                            size_t *signature_len) {
+  NSCParameterAssert(rsactx != NULL);
+  NSCParameterAssert(hash != NULL);
+  NSCParameterAssert(signature != NULL);
+  NSCParameterAssert(signature_len != NULL);
+
   CSSM_ACCESS_CREDENTIALS credentials = {};
 
   CSSM_CC_HANDLE context = CSSM_INVALID_HANDLE;
@@ -979,6 +1008,13 @@ int _libssh2_dsa_new(libssh2_dsa_ctx **dsa,
                      unsigned long ylen,
                      unsigned char const *x,
                      unsigned long x_len) {
+  NSCParameterAssert(dsa != NULL);
+  NSCParameterAssert(pdata != NULL);
+  NSCParameterAssert(qdata != NULL);
+  NSCParameterAssert(gdata != NULL);
+  NSCParameterAssert(ydata != NULL);
+  NSCParameterAssert(x != NULL);
+
   return 1;
 }
 
@@ -993,6 +1029,9 @@ int _libssh2_dsa_new_private(libssh2_dsa_ctx **dsa,
                              LIBSSH2_SESSION *session,
                              char const *filename,
                              unsigned char const *passphrase) {
+  NSCParameterAssert(dsa != NULL);
+  NSCParameterAssert(filename != NULL);
+
   return 1;
 }
 
@@ -1000,6 +1039,10 @@ int _libssh2_dsa_sha1_verify(libssh2_dsa_ctx *dsactx,
                              unsigned char const *sig,
                              unsigned char const *m,
                              unsigned long m_len) {
+  NSCParameterAssert(dsactx != NULL);
+  NSCParameterAssert(sig != NULL);
+  NSCParameterAssert(m != NULL);
+
   return 0;
 }
 
@@ -1007,6 +1050,10 @@ int _libssh2_dsa_sha1_sign(libssh2_dsa_ctx *dsactx,
                            unsigned char const *hash,
                            unsigned long hash_len,
                            unsigned char *sig) {
+  NSCParameterAssert(dsactx != NULL);
+  NSCParameterAssert(hash != NULL);
+  NSCParameterAssert(sig != NULL);
+
   return 1;
 }
 
@@ -1017,6 +1064,10 @@ int _libssh2_cipher_init(_libssh2_cipher_ctx *h,
                          unsigned char *iv,
                          unsigned char *secret,
                          int encrypt) {
+  NSCParameterAssert(h != NULL);
+  NSCParameterAssert(iv != NULL);
+  NSCParameterAssert(secret != NULL);
+
   return 0;
 }
 
@@ -1025,6 +1076,9 @@ int _libssh2_cipher_crypt(_libssh2_cipher_ctx *ctx,
                           int encrypt,
                           unsigned char *block,
                           size_t blocksize) {
+  NSCParameterAssert(ctx != NULL);
+  NSCParameterAssert(block != NULL);
+
   return 1;
 }
 
@@ -1063,7 +1117,13 @@ int _libssh2_pub_priv_keyfile(LIBSSH2_SESSION *session,
                               size_t *method_len,
                               unsigned char **pubkeydata,
                               size_t *pubkeydata_len,
-                              char const *privatekey,
+                              char const *privatekeyPath,
                               char const *passphrase) {
+  NSCParameterAssert(method != NULL);
+  NSCParameterAssert(method_len != NULL);
+  NSCParameterAssert(pubkeydata != NULL);
+  NSCParameterAssert(pubkeydata_len != NULL);
+  NSCParameterAssert(privatekeyPath != NULL);
+
   return 1;
 }
