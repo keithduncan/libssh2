@@ -273,6 +273,80 @@ static int _libssh2_decode_pem(NSData *pemData, NSData *header, NSData *footer, 
   return 0;
 }
 
+#pragma mark - ASN.1 OID
+
+// Encode only the significant bits of the integer in big endian using only
+// seven bits per output byte, the output byte's upper bit is used to indicate
+// whether there are more bytes.
+static NSData *_libssh2_encode_varlen_integer(uint64_t var) {
+  uint64_t littleVar = CFSwapInt64HostToLittle(var);
+
+  uint8_t significantBits = 64;
+  while (significantBits > 0) {
+    if (littleVar & (1ULL << 63)) break;
+
+    significantBits--;
+    littleVar <<= 1;
+  }
+
+  if (significantBits == 0) {
+    uint8_t zero = 0;
+    return [NSData dataWithBytes:&zero length:1];
+  }
+
+  size_t requiredBytes = (significantBits / 7) + ((significantBits % 7) != 0 ? 1 : 0);
+
+  NSMutableData *encodedInteger = [NSMutableData dataWithLength:requiredBytes];
+  uint8_t *encodedIntegerBytes = [encodedInteger mutableBytes];
+
+  for (uint8_t currentByte = 0; currentByte < requiredBytes; currentByte++) {
+    uint8_t bits = (currentByte == 0 ? (significantBits % 7) : 7);
+
+    uint64_t topBitsMask = 0;
+    for (uint8_t idx = 0, setBits = bits; idx < 8; idx++) {
+      topBitsMask <<= 1;
+      if (setBits > 0) {
+        topBitsMask |= 1;
+        setBits--;
+      }
+    }
+
+    topBitsMask <<= 56;
+
+    uint8_t value = ((littleVar & topBitsMask) >> (64 - bits));
+    littleVar <<= bits;
+
+    BOOL more = (currentByte < (requiredBytes - 1));
+    uint8_t encodedByte = (more ? 0x80 : 0x00) | value;
+    encodedIntegerBytes[currentByte] = encodedByte;
+  }
+
+	return encodedInteger;
+}
+
+// Encoding for BER and DER is equivalent.
+static NSData *_libssh2_encode_oid(uint32_t *components, size_t count) {
+  NSMutableData *oid = [NSMutableData data];
+
+  for (NSUInteger idx = 0; idx < count; idx++) {
+    BOOL firstIdentifier = (idx == 0);
+    if (firstIdentifier && count >= 2) {
+      uint8_t component1 = (uint8_t)components[0];
+      uint8_t component2 = (uint8_t)components[1];
+
+      uint8_t combinedComponent = ((component1 * 40) + component2);
+      [oid appendBytes:&combinedComponent length:1];
+
+      idx++;
+      continue;
+    }
+
+    [oid appendData:_libssh2_encode_varlen_integer(components[idx])];
+  }
+
+  return oid;
+}
+
 #pragma mark - RSA
 
 static int _libssh2_rsa_new_raw_from_blob(CSSM_KEY **keyRef, CSSM_KEYBLOB_FORMAT format, CSSM_KEYCLASS keyClass, NSData *blob) {
