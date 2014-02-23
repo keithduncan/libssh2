@@ -355,37 +355,9 @@ static NSData *_libssh2_oid_rsa(void) {
   return _libssh2_encode_oid(oidComponents, sizeof(oidComponents)/sizeof(*oidComponents));
 }
 
-#pragma mark - RSA
+#pragma mark - PKCS#1
 
-static int _libssh2_rsa_new_raw_from_blob(CSSM_KEY **keyRef, CSSM_KEYBLOB_FORMAT format, CSSM_KEYCLASS keyClass, NSData *blob) {
-  CSSM_KEY key = {
-    .KeyHeader = {
-      .HeaderVersion = CSSM_KEYHEADER_VERSION,
-      .BlobType = CSSM_KEYBLOB_RAW,
-      .Format = format,
-      .AlgorithmId = CSSM_ALGID_RSA,
-      .KeyClass = keyClass,
-      .KeyUsage = CSSM_KEYUSE_ANY,
-    },
-    .KeyData = {
-      .Length = [blob length],
-      .Data = (uint8_t *)[blob bytes],
-    },
-  };
-
-  CSSM_KEY *newKey = _libssh2_copy_key(&key);
-
-  int keyError = _libssh2_key_query_size(newKey);
-  if (keyError != 0) {
-    _libssh2_key_free(newKey);
-    return 1;
-  }
-
-  *keyRef = newKey;
-  return 0;
-}
-
-// PKCS#1 <http://tools.ietf.org/html/rfc3447#appendix-A.1.2>
+// <http://tools.ietf.org/html/rfc3447#appendix-A.1.2>
 
 typedef struct {
   CSSM_DATA version; // RSA_Version_TwoPrime
@@ -430,7 +402,9 @@ static SecAsn1Template const _libssh2_pkcs1_rsa_public_key_template[] = {
   { },
 };
 
-// PKCS#8 <http://tools.ietf.org/html/rfc5958>
+#pragma mark - PKCS#8
+
+// <http://tools.ietf.org/html/rfc5958>
 
 typedef struct {
   CSSM_DATA version;
@@ -438,7 +412,7 @@ typedef struct {
   CSSM_DATA privateKey;
 } _libssh2_pkcs8_private_key;
 
-static SecAsn1Template const _libssh2_pkcs8_privateKeyAlgorithm_template[] = {
+static SecAsn1Template const _libssh2_pkcs8_algorithm_identifier_template[] = {
   { .kind = SEC_ASN1_SEQUENCE, .size = sizeof(SecAsn1AlgId) },
   { .kind = SEC_ASN1_OBJECT_ID, .offset = offsetof(SecAsn1AlgId, algorithm) },
   { .kind = SEC_ASN1_OPTIONAL | SEC_ASN1_ANY, .offset = offsetof(SecAsn1AlgId, parameters) },
@@ -448,10 +422,52 @@ static SecAsn1Template const _libssh2_pkcs8_privateKeyAlgorithm_template[] = {
 static SecAsn1Template const _libssh2_pkcs8_private_key_template[] = {
   { .kind = SEC_ASN1_SEQUENCE, .size = sizeof(_libssh2_pkcs8_private_key) },
   { .kind = SEC_ASN1_INTEGER, .offset = offsetof(_libssh2_pkcs8_private_key, version) },
-  { .kind = SEC_ASN1_INLINE, .offset = offsetof(_libssh2_pkcs8_private_key, privateKeyAlgorithm), .sub = &_libssh2_pkcs8_privateKeyAlgorithm_template },
+  { .kind = SEC_ASN1_INLINE, .offset = offsetof(_libssh2_pkcs8_private_key, privateKeyAlgorithm), .sub = &_libssh2_pkcs8_algorithm_identifier_template },
   { .kind = SEC_ASN1_OCTET_STRING, .offset = offsetof(_libssh2_pkcs8_private_key, privateKey) },
   { },
 };
+
+typedef struct {
+  SecAsn1AlgId encryptedAlgorithm;
+  CSSM_DATA encryptedData;
+} _libssh2_pkcs8_encrypted_private_key;
+
+static SecAsn1Template const _libssh2_pkcs8_encrypted_private_key_template[] = {
+  { .kind = SEC_ASN1_SEQUENCE, .size = sizeof(_libssh2_pkcs8_encrypted_private_key) },
+  { .kind = SEC_ASN1_INLINE, .offset = offsetof(_libssh2_pkcs8_encrypted_private_key, encryptedAlgorithm), .sub = &_libssh2_pkcs8_algorithm_identifier_template },
+  { .kind = SEC_ASN1_OCTET_STRING, .offset = offsetof(_libssh2_pkcs8_encrypted_private_key, encryptedData) },
+  { },
+};
+
+#pragma mark - RSA
+
+static int _libssh2_rsa_new_raw_from_blob(CSSM_KEY **keyRef, CSSM_KEYBLOB_FORMAT format, CSSM_KEYCLASS keyClass, NSData *blob) {
+  CSSM_KEY key = {
+    .KeyHeader = {
+      .HeaderVersion = CSSM_KEYHEADER_VERSION,
+      .BlobType = CSSM_KEYBLOB_RAW,
+      .Format = format,
+      .AlgorithmId = CSSM_ALGID_RSA,
+      .KeyClass = keyClass,
+      .KeyUsage = CSSM_KEYUSE_ANY,
+    },
+    .KeyData = {
+      .Length = [blob length],
+      .Data = (uint8_t *)[blob bytes],
+    },
+  };
+
+  CSSM_KEY *newKey = _libssh2_copy_key(&key);
+
+  int keyError = _libssh2_key_query_size(newKey);
+  if (keyError != 0) {
+    _libssh2_key_free(newKey);
+    return 1;
+  }
+
+  *keyRef = newKey;
+  return 0;
+}
 
 static int _libssh2_rsa_new_from_binary_template(libssh2_rsa_ctx **rsa,
                                                  CSSM_KEYBLOB_FORMAT format,
