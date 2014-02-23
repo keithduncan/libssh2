@@ -58,7 +58,8 @@ static void attachToModules(void) {
 }
 
 static void detachFromModules(void) {
-  // FIXME
+  _libssh2_cdsa_csp = CSSM_INVALID_HANDLE;
+  CSSM_Terminate();
 }
 
 void libssh2_crypto_init(void) {
