@@ -804,11 +804,7 @@ int _libssh2_rsa_free(libssh2_rsa_ctx *rsactx) {
 extern OSStatus SecKeyCreateWithCSSMKey(const CSSM_KEY *key, SecKeyRef* keyRef);
 extern const char *cssmErrorString(CSSM_RETURN error);
 
-static int _libssh2_rsa_convert_private_key_to_public_key(CSSM_KEY *privateKey, CSSM_KEY **publicKeyRef) {
-  if (privateKey->KeyHeader.BlobType != CSSM_KEYBLOB_RAW) return 1;
-  if (privateKey->KeyHeader.Format != CSSM_KEYBLOB_RAW_FORMAT_PKCS1) return 1;
-  if (privateKey->KeyHeader.AlgorithmId != CSSM_ALGID_RSA) return 1;
-
+static int _libssh2_rsa_convert_pkcs1_rsa_private_key_to_public_key(CSSM_KEY *privateKey, CSSM_KEY **publicKeyRef) {
   SecAsn1CoderRef coder;
   OSStatus error = SecAsn1CoderCreate(&coder);
   if (error != errSecSuccess) {
@@ -832,6 +828,50 @@ static int _libssh2_rsa_convert_private_key_to_public_key(CSSM_KEY *privateKey, 
   SecAsn1CoderRelease(coder);
 
   return publicKeyError;
+}
+
+static int _libssh2_rsa_convert_pkcs8_rsa_private_key_to_public_key(CSSM_KEY *privateKey, CSSM_KEY **publicKeyRef) {
+  SecAsn1CoderRef coder;
+  OSStatus error = SecAsn1CoderCreate(&coder);
+  if (error != errSecSuccess) {
+    return 1;
+  }
+
+  _libssh2_pkcs8_private_key privateKeyData = {};
+  error = SecAsn1Decode(coder, privateKey->KeyData.Data, privateKey->KeyData.Length, _libssh2_pkcs8_private_key_template, &privateKeyData);
+  if (error != errSecSuccess) {
+    SecAsn1CoderRelease(coder);
+  }
+
+  CSSM_KEY *innerPrivateKey;
+  int innerPrivateKeyError = _libssh2_rsa_new_raw_from_blob(&innerPrivateKey, CSSM_KEYBLOB_RAW_FORMAT_PKCS1, CSSM_KEYCLASS_PRIVATE_KEY, [NSData dataWithBytes:privateKeyData.privateKey.Data length:privateKeyData.privateKey.Length]);
+
+  SecAsn1CoderRelease(coder);
+
+  if (innerPrivateKeyError != 0) {
+    return innerPrivateKeyError;
+  }
+
+  int convertError = _libssh2_rsa_convert_pkcs1_rsa_private_key_to_public_key(innerPrivateKey, publicKeyRef);
+
+  _libssh2_key_free(innerPrivateKey);
+
+  return convertError;
+}
+
+static int _libssh2_rsa_convert_private_key_to_public_key(CSSM_KEY *privateKey, CSSM_KEY **publicKeyRef) {
+  if (privateKey->KeyHeader.BlobType != CSSM_KEYBLOB_RAW) return 1;
+  if (privateKey->KeyHeader.AlgorithmId != CSSM_ALGID_RSA) return 1;
+
+  CSSM_KEYBLOB_FORMAT format = privateKey->KeyHeader.Format;
+  if (format == CSSM_KEYBLOB_RAW_FORMAT_PKCS1) {
+    return _libssh2_rsa_convert_pkcs1_rsa_private_key_to_public_key(privateKey, publicKeyRef);
+  }
+  else if (format == CSSM_KEYBLOB_RAW_FORMAT_PKCS8) {
+    return _libssh2_rsa_convert_pkcs8_rsa_private_key_to_public_key(privateKey, publicKeyRef);
+  }
+
+  return 1;
 }
 
 int _libssh2_rsa_sha1_verify(libssh2_rsa_ctx *rsactx,
