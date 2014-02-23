@@ -347,10 +347,19 @@ static SecAsn1Template const _libssh2_pkcs1_rsa_public_key_template[] = {
   { },
 };
 
-static SecAsn1Template const _libssh2_PKCS1_RSA_public_key_template[] = {
-  { .kind = SEC_ASN1_SEQUENCE, .size = sizeof(_libssh2_PKCS1_RSA_public_key) },
-  { .kind = SEC_ASN1_INTEGER, .offset = offsetof(_libssh2_PKCS1_RSA_public_key, modulus) },
-  { .kind = SEC_ASN1_INTEGER, .offset = offsetof(_libssh2_PKCS1_RSA_public_key, publicExponent) },
+// PKCS#8 <http://tools.ietf.org/html/rfc5958>
+
+typedef struct {
+  CSSM_DATA version;
+  CSSM_OID privateKeyAlgorithm;
+  CSSM_DATA privateKey;
+} _libssh2_pkcs8_private_key;
+
+static SecAsn1Template const _libssh2_pkcs8_private_key_template[] = {
+  { .kind = SEC_ASN1_SEQUENCE, .size = sizeof(_libssh2_pkcs8_private_key) },
+  { .kind = SEC_ASN1_INTEGER, .offset = offsetof(_libssh2_pkcs8_private_key, version) },
+  { .kind = SEC_ASN1_OBJECT_ID, .offset = offsetof(_libssh2_pkcs8_private_key, privateKeyAlgorithm) },
+  { .kind = SEC_ASN1_OCTET_STRING, .offset = offsetof(_libssh2_pkcs8_private_key, privateKey) },
   { },
 };
 
