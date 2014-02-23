@@ -13,7 +13,12 @@ Configuring libssh2 from source
 
 1. ./buildconf
 2. ./configure, check --help for configuration options or see below
-3. make all
+3. `make all`
+
+Testing libssh2
+===============
+
+`make check` will run the tests.
 
 Configuration options
 =====================
