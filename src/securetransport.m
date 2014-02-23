@@ -347,6 +347,14 @@ static NSData *_libssh2_encode_oid(uint32_t *components, size_t count) {
   return oid;
 }
 
+static NSData *_libssh2_oid_rsa(void) {
+  // {iso(1) member-body(2) us(840) rsadsi(113549) pkcs(1) pkcs-1(1) rsaEncryption(1)}
+  // <http://www.oid-info.com/cgi-bin/display?tree=1.2.840.113549.1(1>
+  uint32_t oidComponents[] = { 1, 2, 840, 113549, 1, 1, 1 };
+
+  return _libssh2_encode_oid(oidComponents, sizeof(oidComponents)/sizeof(*oidComponents));
+}
+
 #pragma mark - RSA
 
 static int _libssh2_rsa_new_raw_from_blob(CSSM_KEY **keyRef, CSSM_KEYBLOB_FORMAT format, CSSM_KEYCLASS keyClass, NSData *blob) {
@@ -687,11 +695,7 @@ static int _libssh2_new_der_encoded_key(libssh2_rsa_ctx **rsa, NSData *keyData, 
     return 1;
   }
 
-  // {iso(1) member-body(2) us(840) rsadsi(113549) pkcs(1) pkcs-1(1) rsaEncryption(1)}
-  // <http://www.oid-info.com/cgi-bin/display?tree=1.2.840.113549.1(1>
-  uint32_t rsaOidComponents[] = { 1, 2, 840, 113549, 1, 1, 1 };
-
-  NSData *rsaOid = _libssh2_encode_oid(rsaOidComponents, sizeof(rsaOidComponents)/sizeof(*rsaOidComponents));
+  NSData *rsaOid = _libssh2_oid_rsa();
   if (rsaOid == nil) {
     SecAsn1CoderRelease(coder);
     return 1;
