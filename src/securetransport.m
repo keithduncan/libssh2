@@ -744,6 +744,13 @@ int _libssh2_rsa_sha1_sign(LIBSSH2_SESSION *session,
 
 #pragma mark - DSA
 
+/*
+    Create a DSA private key from the raw numeric components.
+
+    p, q, g, y, x - positive integer in big-endian form.
+
+    Returns 0 if the key is created, 1 otherwise.
+ */
 int _libssh2_dsa_new(libssh2_dsa_ctx **dsa,
                      unsigned char const *pdata,
                      unsigned long plen,
@@ -758,6 +765,13 @@ int _libssh2_dsa_new(libssh2_dsa_ctx **dsa,
   return 1;
 }
 
+/*
+    Create a DSA private key from a file.
+ 
+    Keys can be encoded as FIPS186 or PKCS#8.
+
+    Returns 0 if the key is created, 1 otherwise.
+ */
 int _libssh2_dsa_new_private(libssh2_dsa_ctx **dsa,
                              LIBSSH2_SESSION *session,
                              char const *filename,
