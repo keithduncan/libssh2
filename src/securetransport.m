@@ -5,6 +5,7 @@
 #import <CoreFoundation/CoreFoundation.h>
 #import <Foundation/Foundation.h>
 #import <Security/SecAsn1Coder.h>
+#import <security/SecAsn1Templates.h>
 
 #include "libssh2_priv.h"
 
@@ -351,14 +352,21 @@ static SecAsn1Template const _libssh2_pkcs1_rsa_public_key_template[] = {
 
 typedef struct {
   CSSM_DATA version;
-  CSSM_OID privateKeyAlgorithm;
+  SecAsn1AlgId privateKeyAlgorithm;
   CSSM_DATA privateKey;
 } _libssh2_pkcs8_private_key;
+
+static SecAsn1Template const _libssh2_pkcs8_privateKeyAlgorithm_template[] = {
+  { .kind = SEC_ASN1_SEQUENCE, .size = sizeof(SecAsn1AlgId) },
+  { .kind = SEC_ASN1_OBJECT_ID, .offset = offsetof(SecAsn1AlgId, algorithm) },
+  { .kind = SEC_ASN1_OPTIONAL | SEC_ASN1_ANY, .offset = offsetof(SecAsn1AlgId, parameters) },
+  { },
+};
 
 static SecAsn1Template const _libssh2_pkcs8_private_key_template[] = {
   { .kind = SEC_ASN1_SEQUENCE, .size = sizeof(_libssh2_pkcs8_private_key) },
   { .kind = SEC_ASN1_INTEGER, .offset = offsetof(_libssh2_pkcs8_private_key, version) },
-  { .kind = SEC_ASN1_OBJECT_ID, .offset = offsetof(_libssh2_pkcs8_private_key, privateKeyAlgorithm) },
+  { .kind = SEC_ASN1_INLINE, .offset = offsetof(_libssh2_pkcs8_private_key, privateKeyAlgorithm), .sub = &_libssh2_pkcs8_privateKeyAlgorithm_template },
   { .kind = SEC_ASN1_OCTET_STRING, .offset = offsetof(_libssh2_pkcs8_private_key, privateKey) },
   { },
 };
