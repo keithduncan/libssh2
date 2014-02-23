@@ -71,40 +71,23 @@ void libssh2_crypto_exit(void) {
 
 #pragma mark - PEM
 
-static NSData *_libssh2_pkcs1_rsa_private_key_header(void) {
-  return [@"-----BEGIN RSA PRIVATE KEY-----" dataUsingEncoding:NSUTF8StringEncoding];
-}
-static NSData *_libssh2_pkcs1_rsa_private_key_footer(void) {
-  return [@"-----END RSA PRIVATE KEY-----" dataUsingEncoding:NSUTF8StringEncoding];
-}
+static char const *_libssh2_pkcs1_rsa_private_key_header = "-----BEGIN RSA PRIVATE KEY-----";
+static char const *_libssh2_pkcs1_rsa_private_key_footer = "-----END RSA PRIVATE KEY-----";
 
-static NSData *_libssh2_pkcs1_rsa_public_key_header(void) {
-  return [@"-----BEGIN RSA PUBLIC KEY-----" dataUsingEncoding:NSUTF8StringEncoding];
-}
+static char const *_libssh2_pkcs1_rsa_public_key_header = "-----BEGIN RSA PUBLIC KEY-----";
+static char const *_libssh2_pkcs1_rsa_public_key_footer = "-----END RSA PUBLIC KEY-----";
 
-static NSData *_libssh2_pkcs1_rsa_public_key_footer(void) {
-  return [@"-----END RSA PUBLIC KEY-----" dataUsingEncoding:NSUTF8StringEncoding];
-}
+static char const *_libssh2_pkcs8_private_key_header = "-----BEGIN PRIVATE KEY-----";
+static char const *_libssh2_pkcs8_private_key_footer = "-----END PRIVATE KEY-----";
 
-static NSData *_libssh2_pkcs8_private_key_header(void) {
-  return [@"-----BEGIN PRIVATE KEY-----" dataUsingEncoding:NSUTF8StringEncoding];
-}
-static NSData *_libssh2_pkcs8_private_key_footer(void) {
-  return [@"-----END PRIVATE KEY-----" dataUsingEncoding:NSUTF8StringEncoding];
-}
+static char const *_libssh2_pkcs8_encrypted_private_key_header = "-----BEGIN ENCRYPTED PRIVATE KEY-----";
+static char const *_libssh2_pkcs8_encrypted_private_key_footer = "-----END ENCRYPTED PRIVATE KEY-----";
 
-static NSData *_libssh2_pkcs8_encrypted_private_key_header(void) {
-  return [@"-----BEGIN ENCRYPTED PRIVATE KEY-----" dataUsingEncoding:NSUTF8StringEncoding];
-}
-static NSData *_libssh2_pkcs8_encrypted_private_key_footer(void) {
-  return [@"-----END ENCRYPTED PRIVATE KEY-----" dataUsingEncoding:NSUTF8StringEncoding];
-}
+static char const *_libssh2_pkcs8_public_key_header = "-----BEGIN PUBLIC KEY-----";
+static char const *_libssh2_pkcs8_public_key_footer = "-----END PUBLIC KEY-----";
 
-static NSData *_libssh2_pkcs8_public_key_header(void) {
-  return [@"-----BEGIN PUBLIC KEY-----" dataUsingEncoding:NSUTF8StringEncoding];
-}
-static NSData *_libssh2_pkcs8_public_key_footer(void) {
-  return [@"-----END PUBLIC KEY-----" dataUsingEncoding:NSUTF8StringEncoding];
+static NSData *data(char const *string) {
+  return [NSData dataWithBytes:string length:strlen(string)];
 }
 
 static BOOL dataHasPrefix(NSData *data, NSData *prefix) {
@@ -452,10 +435,10 @@ static int _libssh2_rsa_new_public(libssh2_rsa_ctx **rsa,
 
 static int _libssh2_new_pem_encoded_rsa_pkcs1_key(CSSM_KEY **keyRef, NSData *keyData, NSString *passphrase) {
   CSSM_KEYCLASS keyClass = CSSM_KEYCLASS_OTHER;
-  if (dataHasPrefix(keyData, _libssh2_pkcs1_rsa_private_key_header())) {
+  if (dataHasPrefix(keyData, data(_libssh2_pkcs1_rsa_private_key_header))) {
     keyClass = CSSM_KEYCLASS_PRIVATE_KEY;
   }
-  else if (dataHasPrefix(keyData, _libssh2_pkcs1_rsa_public_key_header())) {
+  else if (dataHasPrefix(keyData, data(_libssh2_pkcs1_rsa_public_key_header))) {
     keyClass = CSSM_KEYCLASS_PUBLIC_KEY;
   }
   if (keyClass == CSSM_KEYCLASS_OTHER) {
@@ -464,12 +447,12 @@ static int _libssh2_new_pem_encoded_rsa_pkcs1_key(CSSM_KEY **keyRef, NSData *key
 
   NSData *header, *footer;
   if (keyClass == CSSM_KEYCLASS_PRIVATE_KEY) {
-    header = _libssh2_pkcs1_rsa_private_key_header();
-    footer = _libssh2_pkcs1_rsa_private_key_footer();
+    header = data(_libssh2_pkcs1_rsa_private_key_header);
+    footer = data(_libssh2_pkcs1_rsa_private_key_footer);
   }
   else if (keyClass == CSSM_KEYCLASS_PUBLIC_KEY) {
-    header = _libssh2_pkcs1_rsa_public_key_header();
-    footer = _libssh2_pkcs1_rsa_public_key_footer();
+    header = data(_libssh2_pkcs1_rsa_public_key_header);
+    footer = data(_libssh2_pkcs1_rsa_public_key_footer);
   }
 
   NSArray *headers = nil;
