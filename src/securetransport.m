@@ -347,12 +347,10 @@ static NSData *_libssh2_encode_oid(uint32_t *components, size_t count) {
   return oid;
 }
 
-static NSData *_libssh2_oid_rsa(void) {
-  // {iso(1) member-body(2) us(840) rsadsi(113549) pkcs(1) pkcs-1(1) rsaEncryption(1)}
-  // <http://www.oid-info.com/cgi-bin/display?tree=1.2.840.113549.1(1>
-  uint32_t oidComponents[] = { 1, 2, 840, 113549, 1, 1, 1 };
+#define _libssh2_oid(__components) _libssh2_encode_oid(__components, sizeof(__components)/sizeof(*__components))
 
-  return _libssh2_encode_oid(oidComponents, sizeof(oidComponents)/sizeof(*oidComponents));
+static BOOL _libssh2_oid_equal(NSData *oid1, CSSM_OID *oid2) {
+  return [[NSData dataWithBytes:oid2->Data length:oid2->Length] isEqualToData:oid1];
 }
 
 #pragma mark - PKCS#1
@@ -401,6 +399,24 @@ static SecAsn1Template const _libssh2_pkcs1_rsa_public_key_template[] = {
   { .kind = SEC_ASN1_INTEGER, .offset = offsetof(_libssh2_pkcs1_rsa_public_key, publicExponent) },
   { },
 };
+
+// OIDs
+// Tree <http://www.oid-info.com/cgi-bin/display?tree=1.2.840.113549.1(1>
+// Definitions <http://tools.ietf.org/html/rfc3447#appendix-C>
+
+// {iso(1) member-body(2) us(840) rsadsi(113549) pkcs(1) pkcs-1(1) rsaEncryption(1)}
+static uint32_t _libssh2_oid_rsa[] = { 1, 2, 840, 113549, 1, 1, 1 };
+
+#pragma mark - PKCS#5
+
+// <https://tools.ietf.org/html/rfc2898>
+
+// OIDs
+// Tree <http://www.oid-info.com/cgi-bin/display?tree=1.2.840.113549.1(5>
+// Definitions <https://tools.ietf.org/html/rfc2898#appendix-C>
+
+// {iso(1) member-body(2) us(840) rsadsi(113549) pkcs(1) pkcs-5(5) pbeWithMD5AndDES-CBC(3) }
+static uint32_t _libssh2_oid_pbeWithMD5AndDES_CBC[] = { 1, 2, 840, 113549, 1, 5, 3 };
 
 #pragma mark - PKCS#8
 
@@ -616,14 +632,7 @@ static int _libssh2_new_der_private_key(libssh2_rsa_ctx **rsa, NSData *keyData) 
     return 1;
   }
 
-  NSData *rsaOid = _libssh2_oid_rsa();
-  if (rsaOid == nil) {
-    SecAsn1CoderRelease(coder);
-    return 1;
-  }
-
-  CSSM_OID privateKeyAlgorithm = privateKeyData.privateKeyAlgorithm.algorithm;
-  if (![[NSData dataWithBytes:privateKeyAlgorithm.Data length:privateKeyAlgorithm.Length] isEqualToData:rsaOid]) {
+  if (!_libssh2_oid_equal(_libssh2_oid(_libssh2_oid_rsa), &privateKeyData.privateKeyAlgorithm.algorithm)) {
     SecAsn1CoderRelease(coder);
     return 1;
   }
