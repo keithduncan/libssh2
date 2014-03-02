@@ -667,17 +667,45 @@ static int _libssh2_new_der_private_key(libssh2_rsa_ctx **rsa, NSData *keyData) 
 }
 
 static int _libssh2_new_der_encrypted_private_key(libssh2_rsa_ctx **rsa, NSData *keyData, NSString *passphrase) {
+  if (passphrase == nil) {
+    return 1;
+  }
+
   SecAsn1CoderRef coder;
   OSStatus error = SecAsn1CoderCreate(&coder);
   if (error != errSecSuccess) {
     return 1;
   }
 
-  _libssh2_pkcs8_private_key privateKeyData = {};
-  error = SecAsn1Decode(coder, [keyData bytes], [keyData length], _libssh2_pkcs8_encrypted_private_key_template, &privateKeyData);
+  _libssh2_pkcs8_encrypted_private_key encryptedKeyData = {};
+  error = SecAsn1Decode(coder, [keyData bytes], [keyData length], _libssh2_pkcs8_encrypted_private_key_template, &encryptedKeyData);
   if (error != errSecSuccess) {
     SecAsn1CoderRelease(coder);
     return 1;
+  }
+
+  if (_libssh2_oid_equal(_libssh2_oid(_libssh2_oid_pbeWithMD5AndDES_CBC), &encryptedKeyData.encryptedAlgorithm.algorithm)) {
+    struct {
+      const CSSM_OID		*oid;
+      CSSM_ALGORITHMS		keyAlg;		// e.g., CSSM_ALGID_DES
+      CSSM_ALGORITHMS		encrAlg;	// e.g., CSSM_ALGID_3DES_3KEY_EDE
+      CSSM_ALGORITHMS		pbeHashAlg;	// SHA1 or MD5
+      uint32				keySizeInBits;
+      uint32				blockSizeInBytes;	// for IV, optional
+      CSSM_PADDING		padding;	// CSSM_PADDING_PKCS7, etc.
+      CSSM_ENCRYPT_MODE	mode;		// CSSM_ALGMODE_CBCPadIV8, etc.
+    } PKCSOidInfo = {
+      &CSSMOID_PKCS5_pbeWithMD5AndDES,
+      CSSM_ALGID_DES,
+      CSSM_ALGID_DES,
+      CSSM_ALGID_MD5,
+      64,
+      8,
+      CSSM_PADDING_PKCS7,
+      CSSM_ALGMODE_CBCPadIV8,
+    };
+
+
   }
 
   SecAsn1CoderRelease(coder);
