@@ -33,4 +33,6 @@ mkinstalldirs
 tags
 libssh2.pc
 TAGS
+compile
+test-driver
 *~

@@ -8,6 +8,21 @@ Web site: http://www.libssh2.org/
 
 Mailing list: http://cool.haxx.se/mailman/listinfo/libssh2-devel
 
+Configuring libssh2 from source
+===============================
+
+1. ./buildconf
+2. ./configure, check --help for configuration options or see below
+3. `make all`
+
+Testing libssh2
+===============
+
+`make check` will run the tests.
+
+Configuration options
+=====================
+
 Generic installation instructions are in INSTALL.  Some ./configure
 options deserve additional comments:
 
@@ -51,18 +66,18 @@ options deserve additional comments:
 		server using dh-gex, try this option to fallback on
 		the older more reliable method.
 
-  	* --with-libgcrypt
-  	* --without-libgcrypt
+  * --with-libgcrypt
+  * --without-libgcrypt
 	* --with-libgcrypt-prefix=DIR
 
 		libssh2 can use the Libgcrypt library
 		(http://www.gnupg.org/) for cryptographic operations.
-		Either Libgcrypt or OpenSSL is required.
+		One of Libgcrypt, OpenSSL or SecureTransport is required.
 
 		Configure will attempt to locate Libgcrypt
 		automatically.
 
- 		If your installation of Libgcrypt is in another
+		If your installation of Libgcrypt is in another
 		location, specify it using --with-libgcrypt-prefix.
 
 	* --with-openssl
@@ -71,13 +86,22 @@ options deserve additional comments:
 
 		libssh2 can use the OpenSSL library
 		(http://www.openssl.org) for cryptographic operations.
-		Either Libgcrypt or OpenSSL is required.
+		One of Libgcrypt, OpenSSL or SecureTransport is required.
 
 		Configure will attempt to locate OpenSSL in the
 		default location.
 
 		If your installation of OpenSSL is in another
 		location, specify it using --with-libssl-prefix.
+
+	* --with-securetransport
+
+		libssh2 can use the Mac OS X Security.framework library
+		for cryptographic operations.
+		One of Libgcrypt, OpenSSL or SecureTransport is required.
+
+		Configure will attempt to locate Security.framework in the
+		default location.
 
 	* --with-libz
 	* --without-libz

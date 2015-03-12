@@ -89,6 +89,9 @@ AC_ARG_WITH(openssl,
 AC_ARG_WITH(libgcrypt,
   AC_HELP_STRING([--with-libgcrypt],[Use libgcrypt for crypto]),
   use_libgcrypt=$withval,use_libgcrypt=auto)
+AC_ARG_WITH(securetransport,
+  AC_HELP_STRING([--with-securetransport],[Use Security.framework for crypto]),
+  use_securetransport=$withval,use_securetransport=auto)
 AC_ARG_WITH(libz,
   AC_HELP_STRING([--with-libz],[Use zlib for compression]),
   use_libz=$withval,use_libz=auto)
@@ -125,10 +128,32 @@ if test "$ac_cv_libgcrypt" = "yes"; then
 fi
 AM_CONDITIONAL(LIBGCRYPT, test "$ac_cv_libgcrypt" = "yes")
 
+# Look for Security.framework
+if test "$found_crypto" = "none" && test "$use_securetransport" != "no"; then
+  save_LIBS="$LIBS"
+  LIBS="$LIBS -framework Security"
+  AC_LINK_IFELSE(
+    [AC_LANG_PROGRAM([],[])],
+    [cv_framework_securetransport=yes],
+    [cv_framework_securetransport=no])
+  LIBS="$save_libs"
+fi
+if test "$cv_framework_securetransport" = "yes"; then
+  AC_DEFINE([LIBSSH2_SECURETRANSPORT], 1, [Use SecureTransport])
+  LIBS="$LIBS -framework Security -framework Foundation"
+  found_crypto=securetransport
+
+  AC_CHECK_FUNCS(SecRandomCopyBytes)
+
+  AC_PROG_OBJC
+fi
+AM_CONDITIONAL(SECURETRANSPORT, test "$cv_framework_securetransport" = "yes")
+
 if test "$found_crypto" = "none"; then
   AC_MSG_ERROR([No crypto library found!
 Try --with-libssl-prefix=PATH\
  or --with-libgcrypt-prefix=PATH\
+ or --with-securetransport\
 ])
 fi
 
