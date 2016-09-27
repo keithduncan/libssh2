@@ -16,16 +16,25 @@
 #include <errno.h>
 #include <stdio.h>
 #include <string.h>
+#ifdef HAVE_STDLIB_H
 #include <stdlib.h>
+#endif
+#ifdef HAVE_UNISTD_H
 #include <unistd.h>
+#endif
 #include <sys/types.h>
-
 #ifdef HAVE_SYS_SELECT_H
 #include <sys/select.h>
 #endif
 
 #ifndef INADDR_NONE
 #define INADDR_NONE (in_addr_t)~0
+#endif
+
+#ifndef HAVE_SNPRINTF
+# ifdef HAVE__SNPRINTF
+# define snprintf _snprintf
+# endif
 #endif
 
 const char *keyfile1 = "/home/username/.ssh/id_rsa.pub";
@@ -241,7 +250,7 @@ int main(int argc, char *argv[])
         goto shutdown;
     }
 
-    /* NETCONF: http://tools.ietf.org/html/draft-ietf-netconf-ssh-06 */
+    /* NETCONF: https://tools.ietf.org/html/draft-ietf-netconf-ssh-06 */
 
     fprintf(stderr, "Sending NETCONF client <hello>\n");
     snprintf(buf, sizeof(buf),

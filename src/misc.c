@@ -51,10 +51,29 @@
 #include <stdio.h>
 #include <errno.h>
 
-int _libssh2_error(LIBSSH2_SESSION* session, int errcode, const char* errmsg)
+int _libssh2_error_flags(LIBSSH2_SESSION* session, int errcode, const char* errmsg, int errflags)
 {
-    session->err_msg = errmsg;
+    if (session->err_flags & LIBSSH2_ERR_FLAG_DUP)
+        LIBSSH2_FREE(session, (char *)session->err_msg);
+
     session->err_code = errcode;
+    session->err_flags = 0;
+
+    if ((errmsg != NULL) && ((errflags & LIBSSH2_ERR_FLAG_DUP) != 0)) {
+        size_t len = strlen(errmsg);
+        char *copy = LIBSSH2_ALLOC(session, len + 1);
+        if (copy) {
+            memcpy(copy, errmsg, len + 1);
+            session->err_flags = LIBSSH2_ERR_FLAG_DUP;
+            session->err_msg = copy;
+        }
+        else
+            /* Out of memory: this code path is very unlikely */
+            session->err_msg = "former error forgotten (OOM)";
+    }
+    else
+        session->err_msg = errmsg;
+
 #ifdef LIBSSH2DEBUG
     if((errcode == LIBSSH2_ERROR_EAGAIN) && !session->api_block_mode)
         /* if this is EAGAIN and we're in non-blocking mode, don't generate
@@ -65,6 +84,11 @@ int _libssh2_error(LIBSSH2_SESSION* session, int errcode, const char* errmsg)
 #endif
 
     return errcode;
+}
+
+int _libssh2_error(LIBSSH2_SESSION* session, int errcode, const char* errmsg)
+{
+    return _libssh2_error_flags(session, errcode, errmsg, 0);
 }
 
 #ifdef WIN32
@@ -210,17 +234,6 @@ void _libssh2_store_str(unsigned char **buf, const char *str, size_t len)
 }
 
 /* Base64 Conversion */
-
-static const char base64_table[] =
-{
-    'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M',
-    'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z',
-    'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm',
-    'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z',
-    '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '+', '/', '\0'
-};
-
-static const char base64_pad = '=';
 
 static const short base64_reverse_table[256] = {
     -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
@@ -380,6 +393,8 @@ libssh2_free(LIBSSH2_SESSION *session, void *ptr)
 }
 
 #ifdef LIBSSH2DEBUG
+#include <stdarg.h>
+
 LIBSSH2_API int
 libssh2_trace(LIBSSH2_SESSION * session, int bitmask)
 {
