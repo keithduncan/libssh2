@@ -46,6 +46,10 @@
 #include "libgcrypt.h"
 #endif
 
+#ifdef LIBSSH2_SECURETRANSPORT
+#include "securetransport.h"
+#endif
+
 #ifdef LIBSSH2_WINCNG
 #include "wincng.h"
 #endif

@@ -307,6 +307,15 @@ Some ./configure options deserve additional comments:
 	If your installation of OpenSSL is in another
 	location, specify it using --with-libssl-prefix.
 
+ * --with-securetransport
+
+  libssh2 can use the Mac OS X Security.framework library
+  for cryptographic operations.
+  One of Libgcrypt, OpenSSL or SecureTransport is required.
+
+  Configure will attempt to locate Security.framework in the
+  default location.
+
  * --with-libz
  * --without-libz
  * --with-libz-prefix=[DIR]

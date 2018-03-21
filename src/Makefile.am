@@ -8,6 +8,9 @@ endif
 if LIBGCRYPT
 include ../Makefile.libgcrypt.inc
 endif
+if SECURETRANSPORT
+include ../Makefile.SecureTransport.inc
+endif
 if WINCNG
 include ../Makefile.WinCNG.inc
 endif

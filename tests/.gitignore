@@ -6,3 +6,5 @@ Makefile
 Makefile.in
 simple
 ssh2
+*.log
+*.trs
